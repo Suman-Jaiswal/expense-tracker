@@ -1,23 +1,34 @@
-# Install the app dependencies in a full Node docker image
-FROM registry.access.redhat.com/ubi8/nodejs-18:latest
+# Step 1: Build with full Node.js 20 image
+FROM registry.access.redhat.com/ubi8/nodejs-20:latest AS build
 
-# Copy package.json, and optionally package-lock.json if it exists
+WORKDIR /opt/app-root/src
+
+# Copy package.json (+ package-lock.json if available)
 COPY package.json package-lock.json* ./
 
-# Install app dependencies
-RUN \
-  if [ -f package-lock.json ]; then npm ci; \
-  else npm install; \
-  fi
+# Install dependencies (use lockfile if present)
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-# Copy the dependencies into a Slim Node docker image
-FROM registry.access.redhat.com/ubi8/nodejs-18-minimal:latest
+# Copy source code
+COPY . .
 
-# Install app dependencies
-COPY --from=0 /opt/app-root/src/node_modules /opt/app-root/src/node_modules
-COPY . /opt/app-root/src
+# Step 2: Slim runtime image
+FROM registry.access.redhat.com/ubi8/nodejs-20-minimal:latest
 
-ENV NODE_ENV production
-ENV PORT 3001
+WORKDIR /opt/app-root/src
+
+# Copy node_modules from builder
+COPY --from=build /opt/app-root/src/node_modules ./node_modules
+COPY --from=build /opt/app-root/src ./
+
+# Fix ownership for OpenShift random UID
+RUN chown -R 1001:0 /opt/app-root/src
+
+USER 1001
+
+ENV NODE_ENV=production
+ENV PORT=3001
+
+EXPOSE 3001
 
 CMD ["npm", "start"]
