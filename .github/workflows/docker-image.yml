@@ -1,4 +1,4 @@
-name: Build & Push to OpenShift Internal Registry
+name: Build & Push to Docker Hub
 
 on:
   push:
@@ -12,30 +12,14 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Install OpenShift CLI
+      - name: Log in to Docker Hub
         run: |
-          curl -L https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz -o oc.tar.gz
-          tar -xvf oc.tar.gz
-          sudo mv oc /usr/local/bin/
-          oc version --client
-
-      - name: Login to OpenShift
-        run: |
-          echo "${{ secrets.OPENSHIFT_TOKEN }}" | oc login ${{ secrets.OPENSHIFT_SERVER }} --token=- --insecure-skip-tls-verify=true
-
-      - name: Get OpenShift Registry Route
-        id: registry
-        run: |
-          REGISTRY=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
-          echo "REGISTRY=$REGISTRY" >> $GITHUB_ENV
-          echo "Registry: $REGISTRY"
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
       - name: Build Docker image
         run: |
-          docker build -f server/Dockerfile -t expense-tracker:latest ./server
+          docker build -f server/Dockerfile -t ${{ secrets.DOCKER_USERNAME }}/expense-tracker:latest ./server
 
-      - name: Tag & Push image to OpenShift internal registry
+      - name: Push image to Docker Hub
         run: |
-          docker login -u $(oc whoami) -p $(oc whoami -t) $REGISTRY
-          docker tag expense-tracker:latest $REGISTRY/sumanj631-dev/expense-tracker:latest
-          docker push $REGISTRY/sumanj631-dev/expense-tracker:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/expense-tracker:latest
