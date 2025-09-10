@@ -1,10 +1,11 @@
 import express from "express";
+import { fetchAndCalculateOutstanding } from "./index.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get("/", (req, res) => {
-  res.send("Server is running crazy");
+app.get("/", async (req, res) => {
+  res.send(await fetchAndCalculateOutstanding());
 });
 
 export function startServer() {

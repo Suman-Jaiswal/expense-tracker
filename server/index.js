@@ -131,11 +131,12 @@ async function fetchAndCalculateOutstanding() {
     }
 
     fs.writeFileSync(`output.json`, JSON.stringify(processedMessages, null, 2));
+    return processedMessages;
   }
 
   console.log("Current Outstanding:", outstanding);
 }
 
 // fetchAndCalculateOutstanding().catch(console.error);
-
+export { fetchAndCalculateOutstanding };
 startServer();
