@@ -5,10 +5,7 @@ FROM registry.access.redhat.com/ubi8/nodejs-18:latest
 COPY package.json package-lock.json* ./
 
 # Install app dependencies
-RUN \
-  if [ -f package-lock.json ]; then npm ci; \
-  else npm install; \
-  fi
+RUN npm install
 
 # Copy the dependencies into a Slim Node docker image
 FROM registry.access.redhat.com/ubi8/nodejs-18-minimal:latest
