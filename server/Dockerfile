@@ -13,6 +13,8 @@ WORKDIR /opt/app-root/src
 # Copy everything from builder with correct ownership
 COPY --from=build --chown=1001:0 /opt/app-root/src ./
 
+RUN ls -a
+
 USER 1001
 ENV NODE_ENV=production
 ENV PORT=3001
