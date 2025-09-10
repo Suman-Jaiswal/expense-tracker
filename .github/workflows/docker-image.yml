@@ -20,8 +20,4 @@ jobs:
           mkdir -p build
           docker save my-node-app:latest -o build/my-node-app.tar
 
-      - name: Upload image artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: docker-image
-          path: build/my-node-app.tar
+    
