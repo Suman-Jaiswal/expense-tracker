@@ -3,13 +3,13 @@ FROM registry.access.redhat.com/ubi8/nodejs-20:latest AS build
 
 WORKDIR /opt/app-root/src
 
-# Copy package.json (+ package-lock.json if available)
+# Copy package.json (+ lock file if present)
 COPY package.json package-lock.json* ./
 
-# Install dependencies (use lockfile if present)
+# Install dependencies
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-# Copy source code
+# Copy the full source
 COPY . .
 
 # Step 2: Slim runtime image
@@ -17,12 +17,9 @@ FROM registry.access.redhat.com/ubi8/nodejs-20-minimal:latest
 
 WORKDIR /opt/app-root/src
 
-# Copy node_modules from builder
-COPY --from=build /opt/app-root/src/node_modules ./node_modules
-COPY --from=build /opt/app-root/src ./
-
-# Fix ownership for OpenShift random UID
-RUN chown -R 1001:0 /opt/app-root/src
+# Copy files and node_modules with proper ownership for OpenShift random UID
+COPY --from=build --chown=1001:0 /opt/app-root/src/node_modules ./node_modules
+COPY --from=build --chown=1001:0 /opt/app-root/src ./
 
 USER 1001
 
