@@ -1,9 +1,7 @@
-name: Build Docker Image and Commit Artifact
+name: Build & Push to OpenShift Internal Registry
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
     branches: [ "main" ]
 
 jobs:
@@ -11,21 +9,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout source code
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.ACTION_GITHUB_TOKEN }}
+
+      - name: Login to OpenShift
+        run: |
+          echo "${{ secrets.OPENSHIFT_TOKEN }}" | oc login ${{ secrets.OPENSHIFT_SERVER }} --token=- --insecure-skip-tls-verify=true
+
+      - name: Get OpenShift Registry Route
+        id: registry
+        run: |
+          REGISTRY=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
+          echo "REGISTRY=$REGISTRY" >> $GITHUB_ENV
+          echo "Registry: $REGISTRY"
 
       - name: Build Docker image
         run: |
-          docker build -f server/Dockerfile -t my-node-app:latest ./server
-          mkdir -p build
-          docker save my-node-app:latest -o build/my-node-app.tar
+          docker build -f server/Dockerfile -t expense-tracker:latest ./server
 
-      - name: Commit Docker image tarball
+      - name: Tag & Push image to OpenShift internal registry
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add build/my-node-app.tar
-          git commit -m "Add Docker image artifact [skip ci]" || echo "No changes to commit"
-          git push
+          docker login -u $(oc whoami) -p $(oc whoami -t) $REGISTRY
+          docker tag expense-tracker:latest $REGISTRY/sumanj631-dev/expense-tracker:latest
+          docker push $REGISTRY/sumanj631-dev/expense-tracker:latest
