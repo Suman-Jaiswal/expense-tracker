@@ -1,0 +1,22 @@
+name: Trigger OpenShift Build
+
+on:
+  push:
+    branches:
+      - main   # change to your branch if needed
+
+jobs:
+  trigger-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger OpenShift Webhook
+        env:
+          OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer $OPENSHIFT_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Event: push" \
+            -d '{"ref":"refs/heads/main"}' \
+            https://api.rm3.7wse.p1.openshiftapps.com:6443/apis/build.openshift.io/v1/namespaces/sumanj631-dev/buildconfigs/expense-tracker/webhooks/999cf98d-77f6-4ba5-9bf6-8ad7e95b82ff/github
