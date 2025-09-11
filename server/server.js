@@ -1,5 +1,5 @@
 import express from "express";
-import { fetchAndCalculateOutstanding } from "./index.js";
+import { fetchAndCalculateOutstanding } from "./src/services/creditCards/index.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
