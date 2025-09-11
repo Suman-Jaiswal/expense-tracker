@@ -130,7 +130,7 @@ async function fetchAndCalculateOutstanding() {
       processedMessages.push(parsedInfo);
     }
 
-    fs.writeFileSync(`output.json`, JSON.stringify(processedMessages, null, 2));
+    // fs.writeFileSync(`output.json`, JSON.stringify(processedMessages, null, 2));
     return processedMessages;
   }
 
