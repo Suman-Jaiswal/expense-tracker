@@ -10,12 +10,16 @@ COPY . .
 FROM registry.access.redhat.com/ubi8/nodejs-20-minimal:latest
 WORKDIR /opt/app-root/src
 
+# Install qpdf
+USER 0
+RUN microdnf install -y qpdf && microdnf clean all
+USER 1001
+
 # Copy everything from builder with correct ownership
 COPY --from=build --chown=1001:0 /opt/app-root/src ./
 
 RUN ls -a
 
-USER 1001
 ENV NODE_ENV=production
 ENV PORT=3001
 EXPOSE 3001
