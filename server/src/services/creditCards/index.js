@@ -1,7 +1,8 @@
 import * as cheerio from "cheerio";
-import { google } from "googleapis";
+import fs from "fs";
 import { authorize } from "../../auth/index.js";
 import { addTransaction } from "../../repository/transactions.js";
+import { getStatement } from "../../utils/pdfDecrypter.js";
 
 // --- Utility Functions for Parsing Email Content ---
 function parseDebitTransaction(html) {
@@ -68,6 +69,16 @@ function parseTransactionSuccess(html) {
   };
 }
 
+const getEmailMessages = async (gmail, query, maxResults = 10) => {
+  const emailListResponse = await gmail.users.messages.list({
+    userId: "me",
+    q: query,
+    maxResults,
+  });
+
+  return emailListResponse.data.messages;
+};
+
 // --- Main Function to Fetch and Process Emails ---
 async function fetchAndCalculateOutstanding() {
   const auth = await authorize();
@@ -81,13 +92,8 @@ async function fetchAndCalculateOutstanding() {
   const emailQuery = `from:(credit_cards@icicibank.com OR cards@icicibank.com) subject:("Transaction" OR "Payment Received") newer_than:${
     currentDayOfMonth + 15
   }d`;
-  const emailListResponse = await gmail.users.messages.list({
-    userId: "me",
-    q: emailQuery,
-    maxResults: 1,
-  });
 
-  const messages = emailListResponse.data.messages;
+  const messages = getEmailMessages(gmail, emailQuery, 1);
 
   if (messages && messages.length > 0) {
     console.log(`Total Transaction Emails: ${messages.length}`);
@@ -140,5 +146,59 @@ async function fetchAndCalculateOutstanding() {
   console.log("Current Outstanding:", outstanding);
 }
 
-// fetchAndCalculateOutstanding().catch(console.error);
-export { fetchAndCalculateOutstanding };
+const fetchStatement = async (gmail = "icici") => {
+  const emailQuery = `from:(credit_cards@icicibank.com OR cards@icicibank.com) subject:("Statement") newer_than:${30}d`;
+  const messages = await getEmailMessages(gmail, emailQuery, 1);
+  console.log(messages);
+  if (messages && messages.length > 0) {
+    console.log(`Total Transaction Emails: ${messages.length}`);
+    const processedMessages = [];
+
+    for (const message of messages) {
+      const email = await gmail.users.messages.get({
+        userId: "me",
+        id: message.id,
+      });
+      const subject =
+        email.data.payload.headers.find((header) => header.name === "Subject")
+          ?.value || "";
+      console.log("Processing email with subject:", subject);
+
+      if (subject.toLowerCase().includes("statement")) {
+        const attachmentPart =
+          email.data.payload.parts.find(
+            (part) =>
+              part.filename && part.filename.toLowerCase().endsWith(".pdf")
+          ) || null;
+
+        if (!attachmentPart) {
+          console.log("No PDF attachment found in the email.");
+          continue;
+        }
+
+        const attachmentId = attachmentPart.body?.attachmentId;
+
+        const attachment = await gmail.users.messages.attachments.get({
+          userId: "me",
+          messageId: message.id,
+          id: attachmentId,
+        });
+        const attachmentDataBuffer = attachment.data.data;
+
+        fs.writeFileSync(
+          `/tmp/statement.pdf`,
+          Buffer.from(attachmentDataBuffer, "base64")
+        );
+
+        const data = await getStatement();
+        console.log(data);
+
+        processedMessages.push({ id: message.id, info: data });
+      } else {
+        continue;
+      }
+    }
+    return processedMessages;
+  }
+};
+export { fetchAndCalculateOutstanding, fetchStatement };
