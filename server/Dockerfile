@@ -10,9 +10,14 @@ COPY . .
 FROM registry.access.redhat.com/ubi8/nodejs-20-minimal:latest
 WORKDIR /opt/app-root/src
 
-# Install qpdf
+# Install build dependencies and compile qpdf
 USER 0
-RUN microdnf install -y qpdf && microdnf clean all
+RUN microdnf install -y make gcc gcc-c++ zlib-devel wget tar && \
+    wget https://github.com/qpdf/qpdf/releases/download/release-qpdf-11.9.1/qpdf-11.9.1.tar.gz && \
+    tar -xvzf qpdf-11.9.1.tar.gz && \
+    cd qpdf-11.9.1 && ./configure && make && make install && \
+    cd .. && rm -rf qpdf-11.9.1* && \
+    microdnf clean all
 USER 1001
 
 # Copy everything from builder with correct ownership
