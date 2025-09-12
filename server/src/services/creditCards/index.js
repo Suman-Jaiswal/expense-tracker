@@ -1,6 +1,5 @@
 import * as cheerio from "cheerio";
 import fs from "fs";
-import { authorize } from "../../auth/index.js";
 import { addTransaction } from "../../repository/transactions.js";
 import { getStatement } from "../../utils/pdfDecrypter.js";
 
@@ -80,11 +79,7 @@ const getEmailMessages = async (gmail, query, maxResults = 10) => {
 };
 
 // --- Main Function to Fetch and Process Emails ---
-async function fetchAndCalculateOutstanding() {
-  const auth = await authorize();
-  const gmail = google.gmail({ version: "v1", auth });
-
-  let outstanding = 0;
+async function fetchAndCalculateOutstanding(gmail) {
   const currentDayOfMonth = new Date().getDate();
 
   console.log("Current Day of Month:", currentDayOfMonth);
@@ -93,7 +88,8 @@ async function fetchAndCalculateOutstanding() {
     currentDayOfMonth + 15
   }d`;
 
-  const messages = getEmailMessages(gmail, emailQuery, 1);
+  const messages = await getEmailMessages(gmail, emailQuery, 60);
+  console.log("messages:", messages);
 
   if (messages && messages.length > 0) {
     console.log(`Total Transaction Emails: ${messages.length}`);
@@ -117,36 +113,26 @@ async function fetchAndCalculateOutstanding() {
 
       if (subject.toLowerCase().includes("payment received")) {
         parsedInfo = parsePaymentReceived(decodedBody);
-        outstanding -= parseFloat(
-          (parsedInfo.creditedAmount || "0").replace(/,/g, "")
-        );
       } else if (subject.toLowerCase().includes("transaction alert")) {
         parsedInfo = parseDebitTransaction(decodedBody);
-        outstanding += parseFloat(
-          (parsedInfo.transactionAmount || "0").replace(/,/g, "")
-        );
       } else if (subject.toLowerCase().includes("transaction success")) {
         parsedInfo = parseTransactionSuccess(decodedBody);
-        outstanding += parseFloat(
-          (parsedInfo.transactionAmount || "0").replace(/,/g, "")
-        );
       }
-
-      processedMessages.push({ id: message.id, info: parsedInfo });
-      addTransaction({
+      const transaction = {
+        ...parsedInfo,
         id: message.id,
-        info: parsedInfo,
-      });
+        resourceIdentifier: `card_icici_xx${parsedInfo.cardNumber}`,
+      };
+      processedMessages.push(transaction);
+      addTransaction(transaction);
     }
 
     // fs.writeFileSync(`output.json`, JSON.stringify(processedMessages, null, 2));
     return processedMessages;
   }
-
-  console.log("Current Outstanding:", outstanding);
 }
 
-const fetchStatement = async (gmail = "icici") => {
+const fetchStatement = async (gmail) => {
   const emailQuery = `from:(credit_cards@icicibank.com OR cards@icicibank.com) subject:("Statement") newer_than:${30}d`;
   const messages = await getEmailMessages(gmail, emailQuery, 1);
   console.log(messages);
