@@ -34,7 +34,7 @@ function parsePaymentReceived(html) {
   const $ = cheerio.load(html);
   const text = $("body").text();
 
-  const creditedAmount =
+  const transactionAmount =
     text.match(/payment of INR ([\d,]+\.\d{2})/i)?.[1] || null;
   const creditedDate = text.match(/on (\d{2}-[A-Za-z]{3}-\d{4})/i)?.[1] || null;
   const cardNumber = text.match(/XXXX XXXX (\d{4})\b/)?.[1]
@@ -42,7 +42,7 @@ function parsePaymentReceived(html) {
     : null;
 
   return {
-    creditedAmount,
+    transactionAmount,
     creditedDate,
     cardNumber,
     type: "credit",
@@ -121,7 +121,7 @@ async function fetchAndCalculateOutstanding(gmail) {
       const transaction = {
         ...parsedInfo,
         id: message.id,
-        resourceIdentifier: `card_icici_xx${parsedInfo.cardNumber}`,
+        resourceIdentifier: `card_ICICI_${parsedInfo.cardNumber}`,
       };
       processedMessages.push(transaction);
       addTransaction(transaction);

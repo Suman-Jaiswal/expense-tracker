@@ -43,12 +43,16 @@ export default function TransactionList({ resourceIdentifier }) {
 
   return (
     <div>
-      <Table size="middle" dataSource={transactionList}>
+      <Table
+        size="middle"
+        dataSource={transactionList}
+        pagination={{ pageSize: 15 }}
+      >
         {columns.map((col) => {
           if (col.key === "type") {
             return (
               <Column
-                title={col.title}
+                title={col.title || "Payment Done"}
                 dataIndex={col.dataIndex}
                 key={col.key}
                 sorter={col.sorter}
@@ -69,6 +73,15 @@ export default function TransactionList({ resourceIdentifier }) {
               dataIndex={col.dataIndex}
               key={col.key}
               sorter={col.sorter}
+              render={(text) => (
+                <span>
+                  {text
+                    ? text
+                    : !text && col.key === "merchantInfo"
+                    ? "Payment Done"
+                    : "NA"}
+                </span>
+              )}
             />
           );
         })}

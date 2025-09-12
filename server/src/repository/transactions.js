@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, setDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
 import { db } from "../../firebase.js";
 
 const transactionsCollection = collection(db, "transactions");
@@ -25,11 +25,24 @@ export const updateTransaction = async (id, updatedData) => {
   // Implement updating a transaction if needed
 };
 export const deleteTransaction = async (id) => {
-  // Implement deleting a transaction if needed
+  const transactionRef = doc(db, "transactions", id);
+  await deleteDoc(transactionRef);
+  console.log("Transaction deleted with id:", id);
 };
 
 export const addMultipleTransactions = async (transactions) => {
   for (const transaction of transactions) {
     await addTransaction(transaction);
   }
+};
+
+export const deleteAllTransactions = async () => {
+  const snapshot = await getDocs(transactionsCollection);
+  const transactionsList = snapshot.docs.map((doc) => doc.data());
+  for (const transaction of transactionsList) {
+    const transactionRef = doc(db, "transactions", transaction.id);
+    await deleteDoc(transactionRef);
+    console.log("Transaction deleted with id:", transaction.id);
+  }
+  console.log("All transactions deleted");
 };

@@ -4,7 +4,7 @@ import { db } from "../../firebase.js";
 const cards = [
   {
     id: "ICICI_XX9003",
-    resourceIdentifier: "card_icici_xx9003",
+    resourceIdentifier: "card_ICICI_XX9003",
     metaData: {
       cardName: "Saphiro Mastercard",
       bankName: "ICICI",
@@ -25,7 +25,7 @@ const cards = [
   },
   {
     id: "ICICI_XX7009",
-    resourceIdentifier: "card_icici_xx7009",
+    resourceIdentifier: "card_ICICI_XX7009",
     metaData: {
       cardName: "Saphiro AMEX",
       bankName: "ICICI",
@@ -46,7 +46,7 @@ const cards = [
   },
   {
     id: "ICICI_XX5000",
-    resourceIdentifier: "card_icici_xx5000",
+    resourceIdentifier: "card_ICICI_XX5000",
     metaData: {
       cardName: "Amazon Pay",
       bankName: "ICICI",
@@ -67,7 +67,7 @@ const cards = [
   },
   {
     id: "AXIS_XX2376",
-    resourceIdentifier: "card_axis_xx2376",
+    resourceIdentifier: "card_AXIS_XX2376",
     metaData: {
       cardName: "Flipkart Axis",
       bankName: "Axis",
@@ -88,7 +88,7 @@ const cards = [
   },
   {
     id: "SBI_XX5965",
-    resourceIdentifier: "card_sbi_xx5965",
+    resourceIdentifier: "card_SBI_XX5965",
     metaData: {
       cardName: "SimplySAVE",
       bankName: "SBI",
@@ -124,6 +124,7 @@ const addCard = async (card) => {
   });
   console.log("Card added with id:", id);
 };
+
 export const initializeCards = async () => {
   for (const card of cards) {
     await addCard(card);
