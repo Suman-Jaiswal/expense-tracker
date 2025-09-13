@@ -1,7 +1,12 @@
 import * as cheerio from "cheerio";
 import fs from "fs";
+import {
+  addStatement,
+  checkStatementExists,
+  uploadPdfBytesToDrive,
+} from "../../repository/statements.js";
 import { addTransaction } from "../../repository/transactions.js";
-import { getStatement } from "../../utils/pdfDecrypter.js";
+import { decryptPdfTmp } from "../../utils/pdfDecrypter.js";
 
 // --- Utility Functions for Parsing Email Content ---
 function parseDebitTransaction(html) {
@@ -132,13 +137,35 @@ async function fetchAndCalculateOutstanding(gmail) {
   }
 }
 
-const fetchStatement = async (gmail) => {
-  const emailQuery = `from:(credit_cards@icicibank.com OR cards@icicibank.com) subject:("Statement") newer_than:${30}d`;
-  const messages = await getEmailMessages(gmail, emailQuery, 1);
+function extractStatementPeriod(text) {
+  const match = text.match(
+    /period\s+([A-Za-z]+\s+\d{1,2}[\s,\s]+\d{4})\s+to\s+([A-Za-z]+\s+\d{1,2}[\s,\s]+\d{4})/i
+  );
+
+  if (!match) return null;
+
+  const startDate = match[1];
+  const endDate = match[2];
+
+  // Convert to ISO using Date
+  const startISO = new Date(startDate).toISOString().split("T")[0]; // YYYY-MM-DD
+  const endISO = new Date(endDate).toISOString().split("T")[0];
+
+  return { startDate, endDate, startISO, endISO };
+}
+
+const extractCardNumberFromFilename = (filename) => {
+  // 5241XXXXXXXX9003_316671_Retail_Sapphiro_NORM.pdf // take last 6 digits
+  const cardNumber = filename.split("_")[0];
+  return `XX${cardNumber.slice(-4)}`;
+};
+
+const fetchStatement = async (gmail, drive) => {
+  const emailQuery = `from:(credit_cards@icicibank.com OR cards@icicibank.com) subject:("Statement") newer_than:${365}d`;
+  const messages = await getEmailMessages(gmail, emailQuery, 12);
   console.log(messages);
   if (messages && messages.length > 0) {
     console.log(`Total Transaction Emails: ${messages.length}`);
-    const processedMessages = [];
 
     for (const message of messages) {
       const email = await gmail.users.messages.get({
@@ -162,7 +189,17 @@ const fetchStatement = async (gmail) => {
           continue;
         }
 
+        const info = {
+          cardNumber: extractCardNumberFromFilename(attachmentPart.filename),
+          ...extractStatementPeriod(subject),
+        };
+
         const attachmentId = attachmentPart.body?.attachmentId;
+
+        if (await checkStatementExists(message.id)) {
+          console.log("Statement already processed for email id:", message.id);
+          continue;
+        }
 
         const attachment = await gmail.users.messages.attachments.get({
           userId: "me",
@@ -176,15 +213,36 @@ const fetchStatement = async (gmail) => {
           Buffer.from(attachmentDataBuffer, "base64")
         );
 
-        const data = await getStatement();
-        console.log(data);
+        // const data = await getStatement(); // decrypt and parse the saved PDF
+        const decryptedPdfBytes = await decryptPdfTmp(
+          `/tmp/statement.pdf`,
+          "suma0709" // Replace with actual password if needed
+        );
 
-        processedMessages.push({ id: message.id, info: data });
+        console.log(decryptedPdfBytes);
+        const res = await uploadPdfBytesToDrive(
+          drive,
+          decryptedPdfBytes,
+          `card_ICICI_${info.cardNumber}_${info.startISO}_to_${info.endISO}.pdf`
+        );
+
+        await addStatement({
+          id: message.id,
+          resourceIdentifier: `card_ICICI_${info.cardNumber}`,
+          driveFileId: res.id,
+          driveFileWebViewLink: res.webViewLink,
+          driveFileWebContentLink: res.webContentLink,
+          period: {
+            start: info.startISO,
+            end: info.endISO,
+          },
+        });
+
+        console.log("Statement processed and saved for email id:", message.id);
       } else {
         continue;
       }
     }
-    return processedMessages;
   }
 };
 export { fetchAndCalculateOutstanding, fetchStatement };

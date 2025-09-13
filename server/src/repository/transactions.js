@@ -1,4 +1,11 @@
-import { collection, deleteDoc, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+} from "firebase/firestore";
 import { db } from "../../firebase.js";
 
 const transactionsCollection = collection(db, "transactions");

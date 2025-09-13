@@ -5,7 +5,10 @@ import open from "open";
 import path from "path";
 import destroyer from "server-destroy"; // npm install open server-destroy
 
-const SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"];
+const SCOPES = [
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/drive.file",
+];
 // relative path to the credentials.json file
 const CREDENTIALS_PATH = path.join(process.cwd(), "credentials.json");
 const TOKEN_PATH = path.join(process.cwd(), "token.json");

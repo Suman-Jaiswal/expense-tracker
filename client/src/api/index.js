@@ -39,3 +39,13 @@ export const getTransactionsByResourceidentifier = async (
 
   return transactionsList;
 };
+
+export const getAllStatements = async () => {
+  const statementsCollection = collection(db, "statements");
+  const statements = getDocs(statementsCollection);
+  const snapshot = await statements;
+  const statementsList = snapshot.docs.map((doc) => doc.data());
+  console.log("Fetched statements:", statementsList);
+
+  return statementsList;
+};
