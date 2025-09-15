@@ -1,3 +1,6 @@
+import { CloudDownloadOutlined } from "@ant-design/icons";
+import { Button } from "antd";
+
 export function PdfViewer({ statement }) {
   const filename = `${statement.resourceIdentifier}_${statement.period.start}_to_${statement.period.end}.pdf`;
   if (!statement || !statement.driveFileWebContentLink) {
@@ -7,17 +10,31 @@ export function PdfViewer({ statement }) {
     <div>
       {/* Inline viewer */}
       <iframe
-        src={`${statement.driveFileWebViewLink}#toolbar=0&navpanes=0&scrollbar=0`}
+        src={`https://drive.google.com/file/d/${statement.driveFileId}/preview`}
         width="100%"
-        height={window.innerHeight * 0.85}
+        height={window.innerHeight * 0.8}
         style={{ border: "none" }}
         title="PDF Viewer"
       />
 
       {/* Download button */}
-      <a href={statement.driveFileWebViewLink} download={filename}>
-        <button>Download PDF</button>
-      </a>
+      <div
+        style={{
+          textAlign: "center",
+          width: "100%",
+        }}
+      >
+        <Button
+          icon={<CloudDownloadOutlined />}
+          type="primary"
+          style={{ marginTop: 10 }}
+          onClick={() => {
+            window.open(statement.driveFileWebContentLink);
+          }}
+        >
+          Download
+        </Button>
+      </div>
     </div>
   );
 }
