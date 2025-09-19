@@ -32,13 +32,15 @@ export default function MenuBar({ resources, setResourceIdentifier }) {
     () =>
       [
         getItem("item", "Dashboard", "dashboard", <DashboardTwoTone />),
-        getItem("item", "Add Card", "add-card", <PlusCircleTwoTone />),
+        getItem("group", "Actions", "actions", <WalletTwoTone />, [
+          getItem("item", "Add Card", "add-card", <PlusCircleTwoTone />),
+        ]),
 
         resources.cards?.length > 0 &&
           getItem(
             collapsed ? "item" : "group",
             "Cards",
-            "2",
+            "cards",
             <WalletTwoTone />,
             resources.cards.map((card, index) =>
               getItem(
@@ -54,7 +56,7 @@ export default function MenuBar({ resources, setResourceIdentifier }) {
           getItem(
             collapsed ? "item" : "group",
             "Accounts",
-            "3",
+            "accounts",
             <BankTwoTone />,
             resources.accounts.map((account, index) =>
               getItem("item", account.id, `account-${index}`, <BankTwoTone />)
@@ -64,7 +66,7 @@ export default function MenuBar({ resources, setResourceIdentifier }) {
         getItem(
           collapsed ? "item" : "group",
           "Files",
-          "4",
+          "files",
           <FilePdfTwoTone />,
           [getItem("item", "Statements", "statements", <FilePdfTwoTone />)]
         ),
