@@ -3,6 +3,7 @@ import {
   CreditCardTwoTone,
   DashboardTwoTone,
   FilePdfTwoTone,
+  PlusCircleTwoTone,
   WalletTwoTone,
 } from "@ant-design/icons";
 import { Layout, Menu } from "antd";
@@ -30,7 +31,8 @@ export default function MenuBar({ resources, setResourceIdentifier }) {
   const getItems = useCallback(
     () =>
       [
-        getItem("item", "Dashboard", "1", <DashboardTwoTone />),
+        getItem("item", "Dashboard", "dashboard", <DashboardTwoTone />),
+        getItem("item", "Add Card", "add-card", <PlusCircleTwoTone />),
 
         resources.cards?.length > 0 &&
           getItem(

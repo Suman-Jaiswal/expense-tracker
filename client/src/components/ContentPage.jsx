@@ -1,10 +1,11 @@
 import { Tabs } from "antd";
 import React from "react";
+import AddCardModal from "./AddCardModal";
 import OverviewTab from "./OverviewTab";
 import Statements from "./Statements";
 import TransactionList from "./TransactionList";
 
-export default function ContentPage({ resourceIdentifier }) {
+export default function ContentPage({ resources, resourceIdentifier }) {
   console.log(
     "Rendering ContentPage with resourceIdentifier:",
     resourceIdentifier
@@ -25,6 +26,8 @@ export default function ContentPage({ resourceIdentifier }) {
         </div>
       ) : resourceIdentifier === "statements" ? (
         <Statements />
+      ) : resourceIdentifier === "add-card" ? (
+        <AddCardModal />
       ) : (
         <Tabs
           tabPosition={"top"}
@@ -32,7 +35,12 @@ export default function ContentPage({ resourceIdentifier }) {
             {
               label: "Overview",
               key: "1",
-              children: <OverviewTab resourceIdentifier={resourceIdentifier} />,
+              children: (
+                <OverviewTab
+                  resources={resources}
+                  resourceIdentifier={resourceIdentifier}
+                />
+              ),
             },
             {
               label: "Transactions",

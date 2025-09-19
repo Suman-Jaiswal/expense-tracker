@@ -8,7 +8,7 @@ const cards = [
     metaData: {
       cardName: "Saphiro Mastercard",
       bankName: "ICICI",
-      cardType: "Credit Card",
+      cardType: "credit",
       cardNumber: "5241939506469003",
       cardExpiry: "09/31",
       cardCVV: "444",
@@ -29,7 +29,7 @@ const cards = [
     metaData: {
       cardName: "Saphiro AMEX",
       bankName: "ICICI",
-      cardType: "Credit Card",
+      cardType: "credit",
       cardNumber: "374741621027009",
       cardExpiry: "09/31",
       cardCVV: "1841",
@@ -50,7 +50,7 @@ const cards = [
     metaData: {
       cardName: "Amazon Pay",
       bankName: "ICICI",
-      cardType: "Credit Card",
+      cardType: "credit",
       cardNumber: "4315815700135000",
       cardExpiry: "07/32",
       cardCVV: "675",
@@ -71,7 +71,7 @@ const cards = [
     metaData: {
       cardName: "Flipkart Axis",
       bankName: "Axis",
-      cardType: "Credit Card",
+      cardType: "credit",
       cardNumber: "5334670053872376",
       cardExpiry: "06/30",
       cardCVV: "976",
@@ -92,7 +92,7 @@ const cards = [
     metaData: {
       cardName: "SimplySAVE",
       bankName: "SBI",
-      cardType: "Credit Card",
+      cardType: "credit",
       cardNumber: "6529023715095965",
       cardExpiry: "03/32",
       cardCVV: "931",

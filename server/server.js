@@ -22,7 +22,7 @@ export function startServer() {
   // initializeAccounts();
   // initializeCards();
   init()
-    .then(({gmail, drive}) => {
+    .then(({ gmail, drive }) => {
       app.get("/sync-statements", async (req, res) => {
         await fetchStatement(gmail, drive);
         res.send({ message: "Statements synchronized" });
@@ -51,6 +51,10 @@ export function startServer() {
       app.get("/delete-tnxs", async (req, res) => {
         await deleteAllTransactions();
         res.send({ message: "All transactions deleted" });
+      });
+
+      app.get("/", async (req, res) => {
+        res.send("Hello! The server is running.");
       });
 
       app.listen(PORT, () => {

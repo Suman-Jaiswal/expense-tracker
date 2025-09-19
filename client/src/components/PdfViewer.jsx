@@ -2,7 +2,6 @@ import { CloudDownloadOutlined } from "@ant-design/icons";
 import { Button } from "antd";
 
 export function PdfViewer({ statement }) {
-  const filename = `${statement.resourceIdentifier}_${statement.period.start}_to_${statement.period.end}.pdf`;
   if (!statement || !statement.driveFileWebContentLink) {
     return <div>No statement available</div>;
   }
