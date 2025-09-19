@@ -258,7 +258,7 @@ export default function AddCardModal({ onClose = () => {} }) {
               <Input
                 placeholder="Amazon Pay"
                 maxLength={19 + 3} // spaces
-                inputMode="numeric"
+                inputMode="text"
               />
             </Form.Item>
 

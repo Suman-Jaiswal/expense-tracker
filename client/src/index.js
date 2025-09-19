@@ -2,13 +2,16 @@ import "antd/dist/reset.css"; // Ant Design v5 recommended reset
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import GoogleLoginOnly from "./components/GoogleLogin";
 import "./index.css";
 import reportWebVitals from "./reportWebVitals";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <React.StrictMode>
-    <App />
+    <GoogleLoginOnly>
+      <App />
+    </GoogleLoginOnly>
   </React.StrictMode>
 );
 

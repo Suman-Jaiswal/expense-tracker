@@ -19,21 +19,6 @@ const App = () => {
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
-      <Header
-        style={{
-          padding: "0 24px",
-        }}
-      >
-        <div
-          style={{
-            fontWeight: "bold",
-            color: colorBgContainer,
-            fontSize: "16px",
-          }}
-        >
-          Expense Tracker
-        </div>
-      </Header>
       <Layout>
         <MenuBar
           resources={resources}
