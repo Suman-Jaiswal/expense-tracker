@@ -3,7 +3,10 @@ import { google } from "googleapis";
 import { authorize } from "./src/auth/index.js";
 import { deleteAllCards, initializeCards } from "./src/repository/cards.js";
 import { deleteAllStatements } from "./src/repository/statements.js";
-import { deleteAllTransactions } from "./src/repository/transactions.js";
+import {
+  addMultipleTransactions,
+  deleteAllTransactions,
+} from "./src/repository/transactions.js";
 import {
   fetchAndCalculateOutstanding,
   fetchStatement,
@@ -55,6 +58,16 @@ export function startServer() {
 
       app.get("/", async (req, res) => {
         res.send("Hello! The server is running.");
+      });
+
+      app.post("/transactions", async (req, res) => {
+        const transactions = req.body;
+        try {
+          await addMultipleTransactions(transactions);
+          res.send("Transactions Added");
+        } catch (e) {
+          res.send("Bad request");
+        }
       });
 
       app.listen(PORT, () => {
