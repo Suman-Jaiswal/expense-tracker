@@ -1,4 +1,4 @@
-import { Table, Tag } from "antd";
+import { Spin, Table, Tag } from "antd";
 import Column from "antd/es/table/Column";
 import React from "react";
 import { getTransactionsByResourceidentifier } from "../api";
@@ -17,9 +17,9 @@ const columns = [
   },
   {
     title: "Type",
-    dataIndex: "type",
-    key: "type",
-    sorter: (a, b) => a.type.localeCompare(b.type),
+    dataIndex: "transactionType",
+    key: "transactionType",
+    sorter: (a, b) => a.transactionType.localeCompare(b.transactionType),
   },
   {
     title: "Amount",
@@ -32,60 +32,71 @@ const columns = [
 ];
 export default function TransactionList({ resourceIdentifier }) {
   const [transactionList, setTransactionList] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
 
   React.useEffect(() => {
+    setLoading(true);
+    if (!resourceIdentifier) return;
     getTransactionsByResourceidentifier(resourceIdentifier)
       .then((data) => {
         setTransactionList(data);
+        setLoading(false);
       })
-      .catch(console.error);
+      .catch((e) => {
+        console.error(e);
+        setLoading(false);
+      });
   }, [resourceIdentifier]);
 
   return (
     <div>
-      <Table
-        size="middle"
-        dataSource={transactionList}
-        pagination={{ pageSize: 15 }}
-      >
-        {columns.map((col) => {
-          if (col.key === "type") {
+      {loading ? (
+        <Spin style={{ position: "absolute", left: "50%", marginTop: 20 }} />
+      ) : (
+        <Table
+          size="middle"
+          dataSource={transactionList}
+          pagination={{ pageSize: 15 }}
+        >
+          {columns.map((col) => {
+            if (col.key === "transactionType") {
+              return (
+                <Column
+                  title={col.title || "Payment Done"}
+                  dataIndex={col.dataIndex}
+                  key={col.key}
+                  sorter={col.sorter}
+                  render={(text) => {
+                    const color = text === "debited" ? "red" : "green";
+                    return (
+                      <Tag color={color} key={text}>
+                        {text.toUpperCase()}
+                      </Tag>
+                    );
+                  }}
+                />
+              );
+            }
             return (
               <Column
-                title={col.title || "Payment Done"}
+                title={col.title}
                 dataIndex={col.dataIndex}
                 key={col.key}
                 sorter={col.sorter}
-                render={(text) => {
-                  const color = text === "debit" ? "red" : "green";
-                  return (
-                    <Tag color={color} key={text}>
-                      {text.toUpperCase()}
-                    </Tag>
-                  );
-                }}
+                render={(text) => (
+                  <span>
+                    {text
+                      ? text
+                      : !text && col.key === "merchantInfo"
+                      ? "Payment Done"
+                      : "NA"}
+                  </span>
+                )}
               />
             );
-          }
-          return (
-            <Column
-              title={col.title}
-              dataIndex={col.dataIndex}
-              key={col.key}
-              sorter={col.sorter}
-              render={(text) => (
-                <span>
-                  {text
-                    ? text
-                    : !text && col.key === "merchantInfo"
-                    ? "Payment Done"
-                    : "NA"}
-                </span>
-              )}
-            />
-          );
-        })}
-      </Table>
+          })}
+        </Table>
+      )}
     </div>
   );
 }

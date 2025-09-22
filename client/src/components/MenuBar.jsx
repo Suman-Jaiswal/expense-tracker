@@ -1,7 +1,7 @@
 import {
   BankTwoTone,
-  CreditCardTwoTone,
   DashboardTwoTone,
+  DownCircleTwoTone,
   FilePdfTwoTone,
   PlusCircleTwoTone,
   WalletTwoTone,
@@ -32,46 +32,17 @@ export default function MenuBar({ resources, setResourceIdentifier }) {
     () =>
       [
         getItem("item", "Dashboard", "dashboard", <DashboardTwoTone />),
-        getItem("group", "Actions", "actions", <WalletTwoTone />, [
-          getItem("item", "Add Card", "add-card", <PlusCircleTwoTone />),
-        ]),
-
         resources.cards?.length > 0 &&
-          getItem(
-            collapsed ? "item" : "group",
-            "Cards",
-            "cards",
-            <WalletTwoTone />,
-            resources.cards.map((card, index) =>
-              getItem(
-                "item",
-                card.id,
-                `${card.resourceIdentifier}`,
-                <CreditCardTwoTone />
-              )
-            )
-          ),
-
+          getItem("item", "Credit Cards", "credit-cards", <WalletTwoTone />),
         resources.accounts?.length > 0 &&
-          getItem(
-            collapsed ? "item" : "group",
-            "Accounts",
-            "accounts",
-            <BankTwoTone />,
-            resources.accounts.map((account, index) =>
-              getItem("item", account.id, `account-${index}`, <BankTwoTone />)
-            )
-          ),
-
-        getItem(
-          collapsed ? "item" : "group",
-          "Files",
-          "files",
-          <FilePdfTwoTone />,
-          [getItem("item", "Statements", "statements", <FilePdfTwoTone />)]
-        ),
+          getItem("item", "Accounts", "accounts", <BankTwoTone />),
+        getItem("item", "Statements", "statements", <FilePdfTwoTone />),
+        getItem("item", "Actions", "actions", <DownCircleTwoTone />, [
+          getItem("item", "Add Card", "add-card", <PlusCircleTwoTone />),
+          getItem("item", "Add Account", "add-account", <PlusCircleTwoTone />),
+        ]),
       ].filter(Boolean),
-    [resources, collapsed]
+    [resources]
   );
 
   useEffect(() => {
@@ -79,6 +50,19 @@ export default function MenuBar({ resources, setResourceIdentifier }) {
       setItems(getItems());
     }
   }, [resources, getItems]);
+
+  useEffect(() => {
+    const unsubscribe = () =>
+      window.addEventListener("resize", () => {
+        if (window.innerWidth < 768) {
+          setCollapsed(true);
+        } else {
+          setCollapsed(false);
+        }
+      });
+    unsubscribe();
+    return () => window.removeEventListener("resize", unsubscribe);
+  }, []);
 
   return (
     <Sider

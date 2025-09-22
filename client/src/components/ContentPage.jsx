@@ -2,6 +2,7 @@ import { Tabs } from "antd";
 import React from "react";
 import AddCardModal from "./AddCardModal";
 import OverviewTab from "./OverviewTab";
+import ResourceList from "./ResourceList";
 import Statements from "./Statements";
 import TransactionList from "./TransactionList";
 
@@ -28,6 +29,14 @@ export default function ContentPage({ resources, resourceIdentifier }) {
         <Statements />
       ) : resourceIdentifier === "add-card" ? (
         <AddCardModal />
+      ) : resourceIdentifier === "credit-cards" ? (
+        <ResourceList resource={resources.cards} />
+      ) : resourceIdentifier === "accounts" ? (
+        <ResourceList
+          resource={resources.accounts}
+          resourceType="accounts"
+          resourceTitle="Bank Accounts"
+        />
       ) : (
         <Tabs
           tabPosition={"top"}
@@ -35,19 +44,12 @@ export default function ContentPage({ resources, resourceIdentifier }) {
             {
               label: "Overview",
               key: "1",
-              children: (
-                <OverviewTab
-                  resources={resources}
-                  resourceIdentifier={resourceIdentifier}
-                />
-              ),
+              children: <OverviewTab resources={resources} />,
             },
             {
               label: "Transactions",
               key: "2",
-              children: (
-                <TransactionList resourceIdentifier={resourceIdentifier} />
-              ),
+              children: <TransactionList />,
             },
           ]}
         />

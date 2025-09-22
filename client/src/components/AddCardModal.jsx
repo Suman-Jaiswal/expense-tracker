@@ -192,20 +192,30 @@ export default function AddCardModal({ onClose = () => {} }) {
   return (
     <div style={{ padding: "16px 0" }}>
       <Row gutter={24}>
-        <Col xs={24} sm={10}>
+        <Col xs={24} sm={8}>
           {/* Card visual preview */}
-          <CardView
-            cardMetaData={{
-              cardNumber:
-                form.getFieldValue("cardNumber") || "**** **** **** ****",
-              cardType: isAmex(form.getFieldValue("cardNumber") || "")
-                ? "American Express"
-                : "Credit Card",
-              cardCVV: form.getFieldValue("cvv") || "***",
-              cardExpiry: form.getFieldValue("expiry") || "MM/YY",
+
+          <div
+            style={{
+              marginTop: 12,
+              textAlign: "center",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 8,
             }}
-          />
-          <div style={{ marginTop: 12, textAlign: "center" }}>
+          >
+            <CardView
+              cardMetaData={{
+                cardNumber:
+                  form.getFieldValue("cardNumber") || "**** **** **** ****",
+                cardType: isAmex(form.getFieldValue("cardNumber") || "")
+                  ? "American Express"
+                  : "Credit Card",
+                cardCVV: form.getFieldValue("cvv") || "***",
+                cardExpiry: form.getFieldValue("expiry") || "MM/YY",
+              }}
+            />
             <Text type="secondary" style={{ fontSize: 12 }}>
               Upload an optional image of the card (for records).
             </Text>

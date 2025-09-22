@@ -17,6 +17,10 @@ const App = () => {
       .catch(console.error);
   }, []);
 
+  useEffect(() => {
+    console.log(resources);
+  }, [resources]);
+
   return (
     <Layout style={{ minHeight: "100vh" }}>
       <Layout>
@@ -26,8 +30,7 @@ const App = () => {
         />
         <Content
           style={{
-            margin: 12,
-            padding: "0 16px",
+            padding: "0 12px",
             minHeight: 280,
             background: colorBgContainer,
             borderRadius: borderRadiusLG,

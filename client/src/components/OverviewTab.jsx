@@ -1,18 +1,11 @@
 import React from "react";
-import CardView from "./CardView";
 
-export default function OverviewTab({ resources, resourceIdentifier }) {
+export default function OverviewTab({ resource, resourceType }) {
   return (
     <div>
-      {resourceIdentifier.includes("card") && (
-        <CardView
-          cardMetaData={
-            resources.cards?.find(
-              (card) => card.resourceIdentifier === resourceIdentifier
-            ).metaData || {}
-          }
-        />
-      )}
+      {" "}
+      {resourceType}
+      {JSON.stringify(resource, null, 2)}{" "}
     </div>
   );
 }

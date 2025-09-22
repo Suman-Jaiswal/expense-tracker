@@ -1,8 +1,8 @@
 import { CopyOutlined } from "@ant-design/icons";
 import React from "react";
 
-export default function CardView({ cardMetaData = {} }) {
-  console.log("Rendering CardView with cardMetaData:", cardMetaData);
+export default function CardView({ content = {} }) {
+  console.log("Rendering CardView with content:", content);
 
   const previewCardNumber = (number) => {
     if (!number) return "**** **** **** ****";
@@ -42,7 +42,8 @@ export default function CardView({ cardMetaData = {} }) {
         padding: 16,
         background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
         color: "#fff",
-        minHeight: 160,
+        height: 160,
+        width: 280,
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
@@ -56,28 +57,25 @@ export default function CardView({ cardMetaData = {} }) {
           alignItems: "center",
         }}
       >
-        <div style={{ fontSize: 12, opacity: 0.9 }}>
-          {cardMetaData.cardType}
-        </div>
-        <div style={{ fontSize: 14, fontWeight: 600 }}>
-          {cardMetaData.cardName}
-        </div>
+        <div style={{ fontSize: 12, opacity: 0.9 }}>{content.cardType}</div>
+        <div style={{ fontSize: 14, fontWeight: 600 }}>{content.cardName}</div>
       </div>
 
       <div style={{ marginTop: 8 }}>
         <>
           <div
             style={{
-              fontSize: 18,
+              fontSize: 15,
               fontFamily: "monospace",
               letterSpacing: 2,
             }}
           >
-            {previewCardNumber(cardMetaData.cardNumber)}{" "}
+            {previewCardNumber(content.cardNumber)}{" "}
             <CopyOutlined
               onClick={() => {
-                if (cardMetaData.cardNumber) {
-                  navigator.clipboard.writeText(cardMetaData.cardNumber);
+                if (content.cardNumber) {
+                  navigator.clipboard.writeText(content.cardNumber);
+                  console.log("Card number copied to clipboard!");
                 }
               }}
             />
@@ -98,13 +96,13 @@ export default function CardView({ cardMetaData = {} }) {
             <div>
               <div style={{ fontSize: 10, opacity: 0.8 }}>Expiry</div>
               <div style={{ fontSize: 12, marginTop: 4 }}>
-                {cardMetaData.cardExpiry || "MM/YY"}
+                {content.cardExpiry || "MM/YY"}
               </div>
             </div>
             <div>
               <div style={{ fontSize: 10, opacity: 0.8 }}>CVV</div>
               <div style={{ fontSize: 12, marginTop: 4 }}>
-                {cardMetaData.cardCVV || "***"}
+                {content.cardCVV || "***"}
               </div>
             </div>
           </div>

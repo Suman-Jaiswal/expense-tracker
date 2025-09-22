@@ -1,8 +1,9 @@
 // GoogleLoginOnly.jsx
+import { LogoutOutlined, WalletOutlined } from "@ant-design/icons";
 import { Button, Spin, theme } from "antd";
 import { Header } from "antd/es/layout/layout";
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { auth, provider } from "../firebase";
 
 const ALLOWED_EMAIL = "sumanj631@gmail.com"; // only this email can access
@@ -11,6 +12,7 @@ export default function GoogleLoginOnly({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
+  const photoURL = useMemo(() => user?.photoURL || null, [user]);
 
   useEffect(() => {
     setLoading(true);
@@ -33,6 +35,8 @@ export default function GoogleLoginOnly({ children }) {
     });
     return () => unsubscribe();
   }, []);
+
+  console.log(user);
 
   const handleLogin = async () => {
     try {
@@ -59,7 +63,7 @@ export default function GoogleLoginOnly({ children }) {
   };
 
   const {
-    token: { colorBgContainer },
+    token: { colorBgContainer, colorTextLightSolid },
   } = theme.useToken();
 
   if (loading) {
@@ -103,13 +107,27 @@ export default function GoogleLoginOnly({ children }) {
                 fontSize: "16px",
               }}
             >
-              Expense Tracker
+              <WalletOutlined /> My Wallet
             </div>
             <div>
-              <span style={{ color: colorBgContainer, marginRight: 16 }}>
+              <span
+                style={{
+                  color: colorBgContainer,
+                  marginRight: 16,
+                  fontSize: 12,
+                }}
+              >
                 {user.email}
               </span>
-              <Button onClick={handleLogout}>Logout</Button>
+
+              <LogoutOutlined
+                size="small"
+                style={{
+                  color: colorTextLightSolid,
+                  fontSize: 16,
+                }}
+                onClick={handleLogout}
+              />
             </div>
           </Header>
           {children}
