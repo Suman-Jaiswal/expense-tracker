@@ -1,5 +1,6 @@
-import { Breadcrumb, Tabs } from "antd";
+import { Tabs } from "antd";
 import React, { useEffect } from "react";
+import { featureFlag } from "../featureFlag";
 import CardView from "./CardView";
 import OverviewTab from "./OverviewTab";
 import TransactionList from "./TransactionList";
@@ -21,8 +22,8 @@ export default function ResourceList({
   }, [resource, resourceTitle]);
 
   return (
-    <div>
-      <Breadcrumb items={breadcrumbItems} style={{ margin: "16px 0" }} />
+    <div style={{ padding: 16 }}>
+      {/* <Breadcrumb items={breadcrumbItems} style={{ margin: "16px 0" }} /> */}
 
       {selectedResource ? (
         <Tabs
@@ -55,8 +56,6 @@ export default function ResourceList({
             display: "flex",
             gap: 16,
             flexWrap: "wrap",
-            maxHeight: "90vh",
-            overflowY: "auto",
           }}
         >
           {resource.map((item) => (
@@ -76,7 +75,7 @@ export default function ResourceList({
                   },
                   { title: item.id || "Card" },
                 ]);
-                setSelectedResource(item);
+                featureFlag.isSideMenuEnabled && setSelectedResource(item);
               }}
             >
               <CardView key={item.id} content={item.metaData} />

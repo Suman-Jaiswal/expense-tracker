@@ -107,7 +107,7 @@ export default function GoogleLoginOnly({ children }) {
                 fontSize: "16px",
               }}
             >
-              <WalletOutlined /> My Wallet
+              <WalletOutlined style={{ fontWeight: "bold" }} /> My Wallet
             </div>
             <div>
               <span

@@ -1,4 +1,5 @@
 import { CopyOutlined } from "@ant-design/icons";
+import { Card } from "antd";
 import React from "react";
 
 export default function CardView({ content = {} }) {
@@ -36,14 +37,14 @@ export default function CardView({ content = {} }) {
   };
 
   return (
-    <div
+    <Card
+      hoverable
       style={{
         borderRadius: 12,
-        padding: 16,
         background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
         color: "#fff",
         height: 160,
-        width: 280,
+        width: 300,
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
@@ -61,7 +62,7 @@ export default function CardView({ content = {} }) {
         <div style={{ fontSize: 14, fontWeight: 600 }}>{content.cardName}</div>
       </div>
 
-      <div style={{ marginTop: 8 }}>
+      <div style={{ marginTop: 28 }}>
         <>
           <div
             style={{
@@ -108,6 +109,6 @@ export default function CardView({ content = {} }) {
           </div>
         </>
       </div>
-    </div>
+    </Card>
   );
 }

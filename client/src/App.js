@@ -3,6 +3,7 @@ import React, { useEffect } from "react";
 import { getAllResources } from "./api";
 import ContentPage from "./components/ContentPage";
 import MenuBar from "./components/MenuBar";
+import { featureFlag } from "./featureFlag";
 const { Header, Content } = Layout;
 const App = () => {
   const {
@@ -35,13 +36,16 @@ const App = () => {
   return (
     <Layout style={{ minHeight: "100vh" }}>
       <Layout>
-        <MenuBar
-          resources={resources}
-          setResourceIdentifier={setResourceIdentifier}
-        />
+        {featureFlag.isSideMenuEnabled && (
+          <MenuBar
+            resources={resources}
+            setResourceIdentifier={setResourceIdentifier}
+          />
+        )}
+
         <Content
           style={{
-            padding: "0 12px",
+            padding: "0 0",
             minHeight: 280,
             background: colorBgContainer,
             borderRadius: borderRadiusLG,
@@ -49,7 +53,11 @@ const App = () => {
         >
           <ContentPage
             resources={resources}
-            resourceIdentifier={resourceIdentifier}
+            resourceIdentifier={
+              featureFlag.isSideMenuEnabled
+                ? resourceIdentifier
+                : "credit_cards"
+            }
           />
         </Content>
       </Layout>
