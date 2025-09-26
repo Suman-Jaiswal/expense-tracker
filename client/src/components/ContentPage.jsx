@@ -27,9 +27,9 @@ export default function ContentPage({ resources, resourceIdentifier }) {
         </div>
       ) : resourceIdentifier === "statements" ? (
         <Statements />
-      ) : resourceIdentifier === "add-card" ? (
+      ) : resourceIdentifier === "add_card" ? (
         <AddCardModal />
-      ) : resourceIdentifier === "credit-cards" ? (
+      ) : resourceIdentifier === "credit_cards" ? (
         <ResourceList resource={resources.cards} />
       ) : resourceIdentifier === "accounts" ? (
         <ResourceList

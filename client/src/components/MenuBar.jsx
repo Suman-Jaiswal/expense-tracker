@@ -23,33 +23,35 @@ export default function MenuBar({ resources, setResourceIdentifier }) {
   // const {
   //   token: {},
   // } = theme.useToken();
-  const [collapsed, setCollapsed] = useState(false);
-  const [items, setItems] = useState([
-    getItem(null, "Dashboard", "1", <DashboardTwoTone />),
-  ]);
+  const [collapsed, setCollapsed] = useState(
+    window.innerWidth < 768 ? true : false
+  );
+  const [items, setItems] = useState([]);
 
   const getItems = useCallback(
     () =>
       [
         getItem("item", "Dashboard", "dashboard", <DashboardTwoTone />),
         resources.cards?.length > 0 &&
-          getItem("item", "Credit Cards", "credit-cards", <WalletTwoTone />),
+          getItem("item", "Credit Cards", "credit_cards", <WalletTwoTone />),
         resources.accounts?.length > 0 &&
           getItem("item", "Accounts", "accounts", <BankTwoTone />),
         getItem("item", "Statements", "statements", <FilePdfTwoTone />),
         getItem("item", "Actions", "actions", <DownCircleTwoTone />, [
-          getItem("item", "Add Card", "add-card", <PlusCircleTwoTone />),
-          getItem("item", "Add Account", "add-account", <PlusCircleTwoTone />),
+          getItem("item", "Add Card", "add_card", <PlusCircleTwoTone />),
+          getItem("item", "Add Account", "add_account", <PlusCircleTwoTone />),
         ]),
       ].filter(Boolean),
+
     [resources]
   );
 
   useEffect(() => {
     if (resources) {
       setItems(getItems());
+      setResourceIdentifier("credit_cards");
     }
-  }, [resources, getItems]);
+  }, [resources, getItems, items.length, setResourceIdentifier]);
 
   useEffect(() => {
     const unsubscribe = () =>
@@ -73,7 +75,7 @@ export default function MenuBar({ resources, setResourceIdentifier }) {
     >
       <Menu
         theme="light"
-        defaultSelectedKeys={["1"]}
+        defaultSelectedKeys={["credit_cards"]}
         mode="inline"
         items={items}
         onClick={(e) => {

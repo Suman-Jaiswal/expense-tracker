@@ -7,10 +7,7 @@ import {
   addMultipleTransactions,
   deleteAllTransactions,
 } from "./src/repository/transactions.js";
-import {
-  fetchAndCalculateOutstanding,
-  fetchStatement,
-} from "./src/services/creditCards/index.js";
+import { fetchAllStatements } from "./src/services/creditCards/index.js";
 const app = express();
 const PORT = process.env.PORT || 8000;
 
@@ -22,12 +19,10 @@ async function init() {
 }
 
 export function startServer() {
-  // initializeAccounts();
-  // initializeCards();
   init()
     .then(({ gmail, drive }) => {
       app.get("/sync-statements", async (req, res) => {
-        await fetchStatement(gmail, drive);
+        await fetchAllStatements(gmail, drive);
         res.send({ message: "Statements synchronized" });
       });
 
