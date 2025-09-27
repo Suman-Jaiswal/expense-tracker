@@ -9,7 +9,7 @@ import {
 } from "./src/repository/transactions.js";
 import { fetchAllStatements } from "./src/services/creditCards/index.js";
 const app = express();
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 4000;
 
 async function init() {
   const auth = await authorize();
