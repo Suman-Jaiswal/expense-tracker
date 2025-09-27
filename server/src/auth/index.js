@@ -19,7 +19,7 @@ function getAccessToken(oAuth2Client, authUrl) {
       .createServer(async (req, res) => {
         try {
           if (req.url.indexOf("/?code=") > -1) {
-            const qs = new URL(req.url, "http://localhost:3000").searchParams;
+            const qs = new URL(req.url, "http://localhost:4040").searchParams;
             const code = qs.get("code");
             console.log(code);
 
@@ -37,7 +37,7 @@ function getAccessToken(oAuth2Client, authUrl) {
           reject(e);
         }
       })
-      .listen(3000, () => {
+      .listen(4040, () => {
         // open browser automatically
         open(authUrl, { wait: false }).then((cp) => cp.unref());
       });
