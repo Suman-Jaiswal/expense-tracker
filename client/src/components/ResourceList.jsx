@@ -14,7 +14,6 @@ export default function ResourceList({
     { title: resourceTitle },
   ]);
   const [selectedResource, setSelectedResource] = React.useState(null);
-  console.log("ResourceList rendered with resources:", resource);
 
   useEffect(() => {
     setSelectedResource(null);
@@ -56,10 +55,13 @@ export default function ResourceList({
             display: "flex",
             gap: 16,
             flexWrap: "wrap",
+            justifyContent: "center",
+            marginBottom: 32,
           }}
         >
           {resource.map((item) => (
             <div
+              key={item.id}
               style={{
                 cursor: "pointer",
               }}

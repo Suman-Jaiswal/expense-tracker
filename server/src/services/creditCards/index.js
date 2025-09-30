@@ -1,15 +1,15 @@
-import { fetchStatementsAXIS } from "./fetchStatementsAXIS.js";
-import { fetchStatementsICICI } from "./fetchStatementsICICI.js";
-import { fetchStatementsSBI } from "./fetchStatementsSBI.js";
+import { config } from "../../config.js";
+import { fetchStatements } from "./fetchStatements.js";
 
 const fetchAllStatements = async (gmail, drive) => {
-  console.log("Syncing ICICI Credit cards statements");
-  await fetchStatementsICICI(gmail, drive);
-
-  console.log("Syncing SBI Credit cards statements");
-  await fetchStatementsSBI(gmail, drive);
-
-  console.log("Syncing AXIS Credit cards statements");
-  await fetchStatementsAXIS(gmail, drive);
+  for (const key of Object.keys(config.RESOURCES)) {
+    const resource = config.RESOURCES[key];
+    if (!resource.enabled) {
+      console.log(`Skipping ${resource.label} as it is disabled`);
+      continue;
+    }
+    console.log(`Syncing ${resource.label} statements`);
+    await fetchStatements(gmail, drive, resource);
+  }
 };
 export { fetchAllStatements };

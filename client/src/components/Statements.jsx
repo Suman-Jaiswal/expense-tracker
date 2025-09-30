@@ -34,10 +34,7 @@ export default function Statements({ view = "tab", cardSelected }) {
     setSelectedStatement(statement);
     setIsModalOpen(true);
   };
-  const handleOk = () => {
-    setIsModalOpen(false);
-    setSelectedStatement(null);
-  };
+
   const handleCancel = () => {
     setIsModalOpen(false);
     setSelectedStatement(null);
@@ -66,6 +63,7 @@ export default function Statements({ view = "tab", cardSelected }) {
             const id = String(i);
             return (
               <Card
+                key={id}
                 hoverable
                 style={{ width: 300 }}
                 onClick={() => showModal(statement)}

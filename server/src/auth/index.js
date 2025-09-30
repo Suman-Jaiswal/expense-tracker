@@ -21,7 +21,6 @@ function getAccessToken(oAuth2Client, authUrl) {
           if (req.url.indexOf("/?code=") > -1) {
             const qs = new URL(req.url, "http://localhost:4040").searchParams;
             const code = qs.get("code");
-            console.log(code);
 
             res.end(
               "Authentication successful! Please return to the terminal."
@@ -31,7 +30,6 @@ function getAccessToken(oAuth2Client, authUrl) {
             oAuth2Client.setCredentials(tokens);
             resolve(oAuth2Client);
             fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens));
-            console.log("Token stored to", TOKEN_PATH);
           }
         } catch (e) {
           reject(e);

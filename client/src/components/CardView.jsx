@@ -3,8 +3,6 @@ import { Card } from "antd";
 import React from "react";
 
 export default function CardView({ content = {} }) {
-  console.log("Rendering CardView with content:", content);
-
   const previewCardNumber = (number) => {
     if (!number) return "**** **** **** ****";
     const digits = number.replace(/\D/g, "");
@@ -43,8 +41,8 @@ export default function CardView({ content = {} }) {
         borderRadius: 12,
         background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
         color: "#fff",
-        height: 160,
-        width: 300,
+        height: 180,
+        width: 320,
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
@@ -62,11 +60,11 @@ export default function CardView({ content = {} }) {
         <div style={{ fontSize: 14, fontWeight: 600 }}>{content.cardName}</div>
       </div>
 
-      <div style={{ marginTop: 28 }}>
+      <div style={{ marginTop: 40 }}>
         <>
           <div
             style={{
-              fontSize: 15,
+              fontSize: 16,
               fontFamily: "monospace",
               letterSpacing: 2,
             }}

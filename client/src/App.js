@@ -4,13 +4,14 @@ import { getAllResources } from "./api";
 import ContentPage from "./components/ContentPage";
 import MenuBar from "./components/MenuBar";
 import { featureFlag } from "./featureFlag";
-const { Header, Content } = Layout;
+const { Content } = Layout;
 const App = () => {
   const {
-    token: { colorBgContainer, borderRadiusLG, colorInfoBg },
+    token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken();
   const [resources, setResources] = React.useState(null);
-  const [resourceIdentifier, setResourceIdentifier] = React.useState(null);
+  const [resourceIdentifier, setResourceIdentifier] =
+    React.useState("credit_cards");
   const [loading, setLoading] = React.useState(true);
 
   useEffect(() => {
@@ -52,12 +53,9 @@ const App = () => {
           }}
         >
           <ContentPage
+            setResourceIdentifier={setResourceIdentifier}
             resources={resources}
-            resourceIdentifier={
-              featureFlag.isSideMenuEnabled
-                ? resourceIdentifier
-                : "credit_cards"
-            }
+            resourceIdentifier={resourceIdentifier}
           />
         </Content>
       </Layout>

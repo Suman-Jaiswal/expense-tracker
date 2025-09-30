@@ -1,5 +1,5 @@
-import { DownOutlined } from "@ant-design/icons";
-import { Dropdown, Space, Tabs, theme } from "antd";
+import { DownOutlined, PlusCircleTwoTone } from "@ant-design/icons";
+import { Button, Dropdown, Space, Tabs, theme } from "antd";
 import React, { useState } from "react";
 import { featureFlag } from "../featureFlag";
 import AddCardModal from "./AddCardModal";
@@ -8,9 +8,13 @@ import ResourceList from "./ResourceList";
 import Statements from "./Statements";
 import TransactionList from "./TransactionList";
 
-export default function ContentPage({ resources, resourceIdentifier }) {
+export default function ContentPage({
+  resources,
+  resourceIdentifier,
+  setResourceIdentifier,
+}) {
   const {
-    token: { colorBgContainer, colorTextLightSolid },
+    token: { colorTextLightSolid },
   } = theme.useToken();
   console.log(
     "Rendering ContentPage with resourceIdentifier:",
@@ -50,7 +54,7 @@ export default function ContentPage({ resources, resourceIdentifier }) {
       ) : resourceIdentifier === "statements" ? (
         <Statements />
       ) : resourceIdentifier === "add_card" ? (
-        <AddCardModal />
+        <AddCardModal setResourceIdentifier={setResourceIdentifier} />
       ) : resourceIdentifier === "credit_cards" ? (
         <>
           {!featureFlag.isSideMenuEnabled ? (
@@ -61,6 +65,19 @@ export default function ContentPage({ resources, resourceIdentifier }) {
                   <Dropdown
                     menu={{
                       items: [
+                        {
+                          key: "add-card",
+                          label: (
+                            <Button
+                              onClick={() => {
+                                setResourceIdentifier("add_card");
+                              }}
+                              icon={<PlusCircleTwoTone />}
+                            >
+                              Add Card
+                            </Button>
+                          ),
+                        },
                         {
                           key: "",
                           label: (

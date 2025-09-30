@@ -20,7 +20,6 @@ export const getAllResources = async () => {
   const cardsList = cardsSnapshot.docs.map((doc) => doc.data());
   const bankAccountsList = bankAccountsSnapshot.docs.map((doc) => doc.data());
   const resources = { cards: cardsList, accounts: bankAccountsList };
-  console.log("Fetched resources:", resources);
   return resources;
 };
 

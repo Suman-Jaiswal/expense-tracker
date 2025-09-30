@@ -68,7 +68,7 @@ export async function uploadPdfBytesToDrive(drive, pdfBytes, fileName) {
     mimeType: "application/pdf",
     body: bufferToStream(pdfBytes),
   };
-  
+
   const res = await drive.files.create({
     requestBody: fileMetadata,
     media,
@@ -86,3 +86,17 @@ export async function uploadPdfBytesToDrive(drive, pdfBytes, fileName) {
   console.log("✅ Uploaded PDF:", res.data);
   return res.data; // { id, webViewLink, webContentLink }
 }
+
+export const checkStatementExistsInDrive = async (drive, fileName) => {
+  const res = await drive.files.list({
+    q: `name='${fileName}' and mimeType='application/pdf'`,
+    fields: "files(id, name)",
+  });
+  if (res.data.files.length > 0) {
+    const { id } = res.data.files[0];
+    const webViewLink = `https://drive.google.com/file/d/${id}/view?usp=sharing`;
+    const webContentLink = `https://drive.google.com/uc?id=${id}&export=download`;
+    return { id, webViewLink, webContentLink };
+  }
+  return false;
+};

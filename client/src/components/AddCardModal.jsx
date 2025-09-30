@@ -27,12 +27,16 @@ const { Text } = Typography;
  *  <CreditCardModal visible={visible} onClose={() => setVisible(false)} onSubmit={(vals)=>console.log(vals)} />
  */
 
-export default function AddCardModal({ onClose = () => {} }) {
+export default function AddCardModal({
+  onClose = () => {},
+  setResourceIdentifier,
+}) {
   const [form] = Form.useForm();
   // const [imagePreview, setImagePreview] = useState(null);
   // const [rawImageFile, setRawImageFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [banksDropdownOptions, setBanksDropdownOptions] = useState([]);
+  const [messageApi, contextHolder] = message.useMessage();
 
   // Utility: format card number (groups of 4)
   function formatCardNumber(raw = "") {
@@ -173,11 +177,11 @@ export default function AddCardModal({ onClose = () => {} }) {
       };
       // If caller provided onSubmit prop, pass File object too
       addCard(payload).then(() => {
-        message.success("Card added successfully.");
+        messageApi.success("Card added successfully.");
         window.location.reload();
       });
     } catch (err) {
-      message.error("Submit failed.");
+      messageApi.error("Submit failed.");
     } finally {
       setSubmitting(false);
     }
@@ -190,7 +194,8 @@ export default function AddCardModal({ onClose = () => {} }) {
   }, []);
 
   return (
-    <div style={{ padding: "16px 0" }}>
+    <div style={{ padding: "16px" }}>
+      {contextHolder}
       <Row gutter={24}>
         <Col xs={24} sm={8}>
           {/* Card visual preview */}
@@ -220,6 +225,7 @@ export default function AddCardModal({ onClose = () => {} }) {
               Upload an optional image of the card (for records).
             </Text>
           </div>
+          <br />
         </Col>
 
         <Col xs={24} sm={14}>

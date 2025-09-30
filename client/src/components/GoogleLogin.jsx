@@ -1,9 +1,9 @@
 // GoogleLoginOnly.jsx
-import { LogoutOutlined, WalletOutlined } from "@ant-design/icons";
+import { LogoutOutlined } from "@ant-design/icons";
 import { Button, Spin, theme } from "antd";
 import { Header } from "antd/es/layout/layout";
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { auth, provider } from "../firebase";
 
 const ALLOWED_EMAIL = "sumanj631@gmail.com"; // only this email can access
@@ -12,7 +12,6 @@ export default function GoogleLoginOnly({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
-  const photoURL = useMemo(() => user?.photoURL || null, [user]);
 
   useEffect(() => {
     setLoading(true);
@@ -35,8 +34,6 @@ export default function GoogleLoginOnly({ children }) {
     });
     return () => unsubscribe();
   }, []);
-
-  console.log(user);
 
   const handleLogin = async () => {
     try {
@@ -107,7 +104,18 @@ export default function GoogleLoginOnly({ children }) {
                 fontSize: "16px",
               }}
             >
-              <WalletOutlined style={{ fontWeight: "bold" }} /> My Wallet
+              <img
+                src="favicon.jpg"
+                alt=""
+                style={{
+                  height: 30,
+                  width: 30,
+                  borderRadius: 15,
+                  marginRight: 5,
+                  verticalAlign: "middle",
+                }}
+              />{" "}
+              My Wallet
             </div>
             <div>
               <span
