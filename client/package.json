@@ -9,11 +9,14 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
     "antd": "^5.27.3",
+    "date-fns": "^4.1.0",
     "firebase": "^12.2.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-hot-toast": "^2.6.0",
     "react-scripts": "5.0.1",
     "react-sticky-box": "^2.0.5",
+    "recharts": "^3.2.1",
     "tesseract.js": "^6.0.1",
     "web-vitals": "^2.1.4"
   },
@@ -21,7 +24,11 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write \"src/**/*.{js,jsx,json,css}\"",
+    "format:check": "prettier --check \"src/**/*.{js,jsx,json,css}\""
   },
   "eslintConfig": {
     "extends": [

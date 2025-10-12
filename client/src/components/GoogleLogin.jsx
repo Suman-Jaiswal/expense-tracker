@@ -3,7 +3,8 @@ import { LogoutOutlined } from "@ant-design/icons";
 import { Button, Spin, theme } from "antd";
 import { Header } from "antd/es/layout/layout";
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useTheme } from "../context/ThemeContext";
 import { auth, provider } from "../firebase";
 
 const ALLOWED_EMAIL = "sumanj631@gmail.com"; // only this email can access
@@ -59,8 +60,9 @@ export default function GoogleLoginOnly({ children }) {
     setUser(null);
   };
 
+  const { isDarkMode } = useTheme();
   const {
-    token: { colorBgContainer, colorTextLightSolid },
+    token: { colorText },
   } = theme.useToken();
 
   if (loading) {
@@ -91,16 +93,21 @@ export default function GoogleLoginOnly({ children }) {
       ) : (
         <div>
           <Header
+            className="app-header"
             style={{
               padding: "0 24px",
               display: "flex",
               justifyContent: "space-between",
+              alignItems: "center",
+              borderBottom: isDarkMode
+                ? "1px solid #434343"
+                : "1px solid #f0f0f0",
             }}
           >
             <div
               style={{
                 fontWeight: "bold",
-                color: colorBgContainer,
+                color: colorText,
                 fontSize: "16px",
               }}
             >
@@ -120,7 +127,7 @@ export default function GoogleLoginOnly({ children }) {
             <div>
               <span
                 style={{
-                  color: colorBgContainer,
+                  color: colorText,
                   marginRight: 16,
                   fontSize: 12,
                 }}
@@ -131,8 +138,9 @@ export default function GoogleLoginOnly({ children }) {
               <LogoutOutlined
                 size="small"
                 style={{
-                  color: colorTextLightSolid,
+                  color: colorText,
                   fontSize: 16,
+                  cursor: "pointer",
                 }}
                 onClick={handleLogout}
               />

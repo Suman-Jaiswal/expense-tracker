@@ -113,14 +113,17 @@ const fetchStatements = async (gmail, drive, resourceConfig) => {
         const resourceIdentifier = `${resourceConfig.identifierPrefix}${info.cardNumber}`;
         const fileName = `${resourceIdentifier}_${statementData.statementPeriod}.pdf`;
 
-        const driveRes = await validateStatementPDFAndUploadToDrive(
-          gmail,
-          drive,
-          attachmentPart,
-          fileName,
-          message,
-          resourceConfig.pdfPassword
-        );
+        const { driveRes, transactions } =
+          await validateStatementPDFAndUploadToDrive(
+            gmail,
+            drive,
+            attachmentPart,
+            fileName,
+            message,
+            resourceConfig.pdfPassword,
+            resourceIdentifier,
+            message.id
+          );
 
         if (driveRes) {
           await prepareStatementObjectAndSaveInDB(
@@ -129,7 +132,8 @@ const fetchStatements = async (gmail, drive, resourceConfig) => {
             resourceIdentifier,
             driveRes,
             info,
-            statementData
+            statementData,
+            transactions
           );
         }
       } else {

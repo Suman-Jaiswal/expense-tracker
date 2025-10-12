@@ -1,17 +1,25 @@
 import "antd/dist/reset.css"; // Ant Design v5 recommended reset
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { Toaster } from "react-hot-toast";
 import App from "./App";
 import GoogleLoginOnly from "./components/GoogleLogin";
+import { AppProvider } from "./context/AppContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import "./index.css";
 import reportWebVitals from "./reportWebVitals";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <React.StrictMode>
-    <GoogleLoginOnly>
-      <App />
-    </GoogleLoginOnly>
+    <ThemeProvider>
+      <AppProvider>
+        <Toaster position="top-right" />
+        <GoogleLoginOnly>
+          <App />
+        </GoogleLoginOnly>
+      </AppProvider>
+    </ThemeProvider>
   </React.StrictMode>
 );
 

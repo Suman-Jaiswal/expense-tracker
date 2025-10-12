@@ -1,8 +1,9 @@
-import { CopyOutlined } from "@ant-design/icons";
-import { Card } from "antd";
-import React from "react";
+import { CheckOutlined, CopyOutlined } from "@ant-design/icons";
+import { Card, message } from "antd";
+import { useState } from "react";
 
 export default function CardView({ content = {} }) {
+  const [copied, setCopied] = useState(false);
   const previewCardNumber = (number) => {
     if (!number) return "**** **** **** ****";
     const digits = number.replace(/\D/g, "");
@@ -34,78 +35,175 @@ export default function CardView({ content = {} }) {
     );
   };
 
+  const handleCopy = (e) => {
+    e.stopPropagation();
+    if (content.cardNumber) {
+      navigator.clipboard.writeText(content.cardNumber);
+      setCopied(true);
+      message.success("Card number copied!");
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   return (
     <Card
       hoverable
+      className="fade-in"
       style={{
-        borderRadius: 12,
-        background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+        borderRadius: 16,
+        background: "linear-gradient(135deg, #1e293b 0%, #334155 100%)",
         color: "#fff",
-        height: 180,
-        width: 320,
+        height: 200,
+        width: "100%",
+        maxWidth: 380,
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
-        boxShadow: "0 6px 18px rgba(16,24,40,0.12)",
+        boxShadow: "0 8px 24px rgba(0, 0, 0, 0.3)",
+        border: "1px solid rgba(148, 163, 184, 0.1)",
+        transition: "all 0.3s ease",
+      }}
+      bodyStyle={{
+        padding: "20px 24px",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
       }}
     >
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: "flex-start",
         }}
       >
-        <div style={{ fontSize: 12, opacity: 0.9 }}>{content.cardType}</div>
-        <div style={{ fontSize: 14, fontWeight: 600 }}>{content.cardName}</div>
-      </div>
-
-      <div style={{ marginTop: 40 }}>
-        <>
+        <div>
+          <div
+            style={{
+              fontSize: 11,
+              opacity: 0.7,
+              textTransform: "uppercase",
+              letterSpacing: "1px",
+              marginBottom: 4,
+            }}
+          >
+            {content.cardType || "Credit Card"}
+          </div>
           <div
             style={{
               fontSize: 16,
-              fontFamily: "monospace",
-              letterSpacing: 2,
+              fontWeight: 700,
+              background: "linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
             }}
           >
-            {previewCardNumber(content.cardNumber)}{" "}
-            <CopyOutlined
-              onClick={() => {
-                if (content.cardNumber) {
-                  navigator.clipboard.writeText(content.cardNumber);
-                  console.log("Card number copied to clipboard!");
-                }
-              }}
-            />
+            {content.cardName || "Card"}
           </div>
+        </div>
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: "50%",
+            background: "rgba(99, 102, 241, 0.2)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backdropFilter: "blur(10px)",
+          }}
+        >
+          <span style={{ fontSize: 20 }}>💳</span>
+        </div>
+      </div>
+
+      <div>
+        <div
+          style={{
+            fontSize: 18,
+            fontFamily: "monospace",
+            letterSpacing: 3,
+            fontWeight: 500,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 16,
+          }}
+        >
+          {previewCardNumber(content.cardNumber)}
           <div
+            onClick={handleCopy}
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginTop: 12,
+              cursor: "pointer",
+              padding: "4px 8px",
+              borderRadius: 6,
+              background: "rgba(99, 102, 241, 0.2)",
+              transition: "all 0.2s ease",
+              display: "inline-flex",
+              alignItems: "center",
             }}
           >
-            <div>
-              <div style={{ fontSize: 10, opacity: 0.8 }}>Cardholder</div>
-              <div style={{ fontSize: 12, marginTop: 4 }}>
-                SUMAN KUMAR JAISWAL
-              </div>
+            {copied ? (
+              <CheckOutlined style={{ fontSize: 12 }} />
+            ) : (
+              <CopyOutlined style={{ fontSize: 12 }} />
+            )}
+          </div>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 16,
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <div
+              style={{
+                fontSize: 9,
+                opacity: 0.6,
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+              }}
+            >
+              Cardholder
             </div>
-            <div>
-              <div style={{ fontSize: 10, opacity: 0.8 }}>Expiry</div>
-              <div style={{ fontSize: 12, marginTop: 4 }}>
-                {content.cardExpiry || "MM/YY"}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, opacity: 0.8 }}>CVV</div>
-              <div style={{ fontSize: 12, marginTop: 4 }}>
-                {content.cardCVV || "***"}
-              </div>
+            <div style={{ fontSize: 12, marginTop: 4, fontWeight: 500 }}>
+              SUMAN KUMAR JAISWAL
             </div>
           </div>
-        </>
+          <div>
+            <div
+              style={{
+                fontSize: 9,
+                opacity: 0.6,
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+              }}
+            >
+              Expiry
+            </div>
+            <div style={{ fontSize: 12, marginTop: 4, fontWeight: 500 }}>
+              {content.cardExpiry || "MM/YY"}
+            </div>
+          </div>
+          <div>
+            <div
+              style={{
+                fontSize: 9,
+                opacity: 0.6,
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+              }}
+            >
+              CVV
+            </div>
+            <div style={{ fontSize: 12, marginTop: 4, fontWeight: 500 }}>
+              {content.cardCVV || "***"}
+            </div>
+          </div>
+        </div>
       </div>
     </Card>
   );

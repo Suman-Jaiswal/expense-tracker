@@ -1,8 +1,9 @@
 import { DownOutlined, PlusCircleTwoTone } from "@ant-design/icons";
 import { Button, Dropdown, Space, Tabs, theme } from "antd";
-import React, { useState } from "react";
+import { useState } from "react";
 import { featureFlag } from "../featureFlag";
 import AddCardModal from "./AddCardModal";
+import Dashboard from "./Dashboard";
 import OverviewTab from "./OverviewTab";
 import ResourceList from "./ResourceList";
 import Statements from "./Statements";
@@ -14,7 +15,7 @@ export default function ContentPage({
   setResourceIdentifier,
 }) {
   const {
-    token: { colorTextLightSolid },
+    token: { colorBgContainer },
   } = theme.useToken();
   console.log(
     "Rendering ContentPage with resourceIdentifier:",
@@ -31,7 +32,7 @@ export default function ContentPage({
         zIndex: 1,
         margin: 0,
         padding: "4px 16px 0 16px",
-        background: colorTextLightSolid, // prevent overlap transparency
+        background: colorBgContainer, // prevent overlap transparency
       }}
     >
       <DefaultTabBar {...props} style={{ margin: 0 }} />
@@ -51,6 +52,29 @@ export default function ContentPage({
         >
           Please select a resource from the menu to view details.
         </div>
+      ) : resourceIdentifier === "dashboard" ? (
+        <Tabs
+          tabPosition={"top"}
+          defaultActiveKey="1"
+          style={{ padding: "0 24px" }}
+          items={[
+            {
+              label: "📊 Dashboard",
+              key: "1",
+              children: <Dashboard resources={resources} />,
+            },
+            {
+              label: "Overview",
+              key: "2",
+              children: <OverviewTab resources={resources} />,
+            },
+            {
+              label: "Transactions",
+              key: "3",
+              children: <TransactionList />,
+            },
+          ]}
+        />
       ) : resourceIdentifier === "statements" ? (
         <Statements />
       ) : resourceIdentifier === "add_card" ? (
@@ -60,6 +84,7 @@ export default function ContentPage({
           {!featureFlag.isSideMenuEnabled ? (
             <Tabs
               renderTabBar={renderTabBar}
+              style={{ padding: "0 24px" }}
               tabBarExtraContent={{
                 right: (
                   <Dropdown
@@ -148,23 +173,7 @@ export default function ContentPage({
           resourceType="accounts"
           resourceTitle="Bank Accounts"
         />
-      ) : (
-        <Tabs
-          tabPosition={"top"}
-          items={[
-            {
-              label: "Overview",
-              key: "1",
-              children: <OverviewTab resources={resources} />,
-            },
-            {
-              label: "Transactions",
-              key: "2",
-              children: <TransactionList />,
-            },
-          ]}
-        />
-      )}
+      ) : null}
     </div>
   );
 }

@@ -1,0 +1,73 @@
+.mobile-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: var(--bg-primary, #ffffff);
+  border-top: 1px solid var(--border-color, #f0f0f0);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 1000;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.mobile-bottom-nav .nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 8px;
+  transition: all 0.3s ease;
+  color: #8c8c8c;
+}
+
+.mobile-bottom-nav .nav-item:active {
+  transform: scale(0.95);
+}
+
+.mobile-bottom-nav .nav-item.active {
+  color: #1890ff;
+}
+
+.mobile-bottom-nav .nav-icon {
+  font-size: 20px;
+  transition: transform 0.3s ease;
+}
+
+.mobile-bottom-nav .nav-item.active .nav-icon {
+  transform: scale(1.1);
+}
+
+.mobile-bottom-nav .nav-label {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Dark mode support */
+body.dark-mode .mobile-bottom-nav {
+  background: #1f1f1f;
+  border-top-color: #434343;
+}
+
+body.dark-mode .mobile-bottom-nav .nav-item {
+  color: #a8a8a8;
+}
+
+body.dark-mode .mobile-bottom-nav .nav-item.active {
+  color: #1890ff;
+}
+
+/* Add padding to body when mobile nav is visible */
+@media (max-width: 767px) {
+  body {
+    padding-bottom: 60px;
+  }
+}
+

@@ -1,3 +1,3 @@
 export const featureFlag = {
-  isSideMenuEnabled: false,
+  isSideMenuEnabled: true,
 };

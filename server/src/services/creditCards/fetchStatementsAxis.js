@@ -120,22 +120,70 @@ const fetchStatementsAXIS = async (gmail, drive) => {
           Buffer.from(attachmentDataBuffer, "base64")
         );
 
-        // const data = await getStatement(); // decrypt and parse the saved PDF
+        const resourceIdentifier = `card_AXIS_${info.cardNumber}`;
+        const fileName = `${resourceIdentifier}_${info.startISO}_to_${info.endISO}.pdf`;
+
+        // Decrypt and upload PDF
         const decryptedPdfBytes = await decryptPdfTmp(
           `/tmp/statement.pdf`,
-          "SUMA0709" // Replace with actual password if needed
+          "SUMA0709"
         );
 
-        console.log(decryptedPdfBytes);
         const res = await uploadPdfBytesToDrive(
           drive,
           decryptedPdfBytes,
-          `card_AXIS_${info.cardNumber}_${info.startISO}_to_${info.endISO}.pdf`
+          fileName
         );
+        console.log("✅ PDF uploaded to Drive:", fileName);
 
+        // Extract transactions from the PDF
+        let extractedTransactions = [];
+        try {
+          console.log("📊 Extracting transactions from PDF...");
+          const { extractTransactionsFromPDF } = await import(
+            "../transactions/transactionExtractor.js"
+          );
+          const extractionResult = await extractTransactionsFromPDF(
+            `/tmp/statement.pdf`,
+            "SUMA0709"
+          );
+
+          console.log(
+            `✅ Extracted ${extractionResult.totalTransactions} transactions from ${extractionResult.bank} statement`
+          );
+
+          // Format transactions for database
+          if (extractionResult.transactions.length > 0) {
+            extractedTransactions = extractionResult.transactions.map(
+              (txn) => ({
+                id: txn.id,
+                resourceIdentifier: resourceIdentifier,
+                statementId: message.id,
+                date: txn.date,
+                description: txn.description,
+                merchant: txn.merchant,
+                amount: txn.amount,
+                type: txn.type,
+                category: txn.category,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              })
+            );
+          }
+        } catch (extractionError) {
+          console.error(
+            "⚠️  Error extracting transactions:",
+            extractionError.message
+          );
+        }
+
+        // Clean up temp file
+        fs.unlinkSync(`/tmp/statement.pdf`);
+
+        // Save statement to database
         await addStatement({
           id: message.id,
-          resourceIdentifier: `card_AXIS_${info.cardNumber}`,
+          resourceIdentifier: resourceIdentifier,
           driveFileId: res.id,
           driveFileWebViewLink: res.webViewLink,
           driveFileWebContentLink: res.webContentLink,
@@ -146,7 +194,28 @@ const fetchStatementsAXIS = async (gmail, drive) => {
           statementData,
         });
 
-        console.log("Statement processed and saved for email id:", message.id);
+        console.log(
+          "✅ Statement processed and saved for email id:",
+          message.id
+        );
+
+        // Save transactions to database
+        if (extractedTransactions.length > 0) {
+          try {
+            const { addMultipleTransactions } = await import(
+              "../../repository/transactions.js"
+            );
+            console.log(
+              `💾 Saving ${extractedTransactions.length} transactions to database...`
+            );
+            await addMultipleTransactions(extractedTransactions);
+            console.log(
+              `✅ Successfully saved ${extractedTransactions.length} transactions`
+            );
+          } catch (error) {
+            console.error("❌ Error saving transactions:", error.message);
+          }
+        }
       } else {
         continue;
       }
