@@ -4,7 +4,9 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
   setDoc,
+  where,
 } from "firebase/firestore";
 import { Readable } from "stream";
 import { db } from "../../firebase.js";
@@ -17,20 +19,46 @@ export const checkStatementExists = async (id) => {
   return docSnap.exists();
 };
 
+/**
+ * Check if a statement exists by resourceIdentifier and period
+ * This prevents duplicate statements for the same card/period even if from different emails
+ */
+export const checkStatementExistsByPeriod = async (
+  resourceIdentifier,
+  period
+) => {
+  const q = query(
+    statementsCollection,
+    where("resourceIdentifier", "==", resourceIdentifier),
+    where("period.start", "==", period.start),
+    where("period.end", "==", period.end)
+  );
+
+  const snapshot = await getDocs(q);
+  if (!snapshot.empty) {
+    const existingStatement = snapshot.docs[0].data();
+    return existingStatement;
+  }
+  return null;
+};
+
+export const getAllStatements = async () => {
+  const snapshot = await getDocs(statementsCollection);
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+};
+
 export const addStatement = async (statement) => {
   const id = statement.id; // Ensure the statement has a unique 'id' field
-  // check for id in db
   const statementRef = doc(db, "statements", id);
   const docSnap = await getDoc(statementRef);
   if (docSnap.exists()) {
-    console.log("Statement already exists with id:", id);
+    // Already exists, skip silently (logged at higher level)
     return;
   }
   await setDoc(statementRef, {
     ...statement,
     createdAt: new Date().toISOString(),
   });
-  console.log("Statement added with id:", id);
 };
 
 export const addMultipleStatements = async (statements) => {

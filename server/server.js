@@ -86,6 +86,23 @@ export function startServer() {
       );
 
       app.get(
+        "/sync-transactions",
+        asyncHandler(async (req, res) => {
+          console.log(
+            "Starting transaction synchronization from statements..."
+          );
+          const { syncTransactionsFromStatements } = await import(
+            "./src/services/transactions/syncTransactions.js"
+          );
+          const result = await syncTransactionsFromStatements();
+          res.json({
+            ...result,
+            timestamp: new Date().toISOString(),
+          });
+        })
+      );
+
+      app.get(
         "/sync-cards",
         asyncHandler(async (req, res) => {
           console.log("Starting card synchronization...");

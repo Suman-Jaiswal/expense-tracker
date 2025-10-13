@@ -493,10 +493,48 @@ function detectBank(text) {
 
 /**
  * Main function: Extract transactions from PDF
+ * Uses table detection first, falls back to regex if needed
  */
-export async function extractTransactionsFromPDF(pdfPath, password = null) {
+export async function extractTransactionsFromPDF(
+  pdfPath,
+  password = null,
+  resourceIdentifier = "temp"
+) {
   try {
     console.log("📄 Reading PDF:", pdfPath);
+
+    // Try table-based extraction first (more reliable)
+    try {
+      const { extractTransactionsFromPDFTable } = await import(
+        "./tableExtractor.js"
+      );
+      console.log("🔄 Attempting table-based extraction...");
+
+      const tableResult = await extractTransactionsFromPDFTable(
+        pdfPath,
+        password,
+        resourceIdentifier
+      );
+
+      if (tableResult.totalTransactions > 0) {
+        console.log(
+          `✅ Table extraction successful: ${tableResult.totalTransactions} transactions`
+        );
+        return tableResult;
+      }
+
+      console.log(
+        "⚠️  Table extraction found 0 transactions, falling back to regex..."
+      );
+    } catch (tableError) {
+      console.log(
+        "⚠️  Table extraction failed, falling back to regex:",
+        tableError.message
+      );
+    }
+
+    // Fallback to regex-based extraction
+    console.log("🔄 Using regex-based extraction (fallback)...");
 
     let pdfData;
     if (password) {
@@ -531,7 +569,9 @@ export async function extractTransactionsFromPDF(pdfPath, password = null) {
         transactions = extractGenericTransactions(text);
     }
 
-    console.log(`✅ Extracted ${transactions.length} transactions`);
+    console.log(
+      `✅ Extracted ${transactions.length} transactions (regex method)`
+    );
 
     // Add metadata with deterministic IDs
     const result = {
@@ -539,7 +579,7 @@ export async function extractTransactionsFromPDF(pdfPath, password = null) {
       totalTransactions: transactions.length,
       transactions: transactions.map((txn) => ({
         id: generateTransactionId(
-          "temp", // Will be replaced with actual resourceIdentifier later
+          resourceIdentifier,
           txn.date,
           txn.description,
           txn.amount,
@@ -548,6 +588,7 @@ export async function extractTransactionsFromPDF(pdfPath, password = null) {
         ...txn,
       })),
       extractedAt: new Date().toISOString(),
+      method: "regex-fallback",
     };
 
     return result;

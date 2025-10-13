@@ -1,14 +1,12 @@
-import crypto from "crypto";
 import fs from "fs";
 import { config } from "../config.js";
 import {
   addStatement,
   checkStatementExists,
+  checkStatementExistsByPeriod,
   checkStatementExistsInDrive,
   uploadPdfBytesToDrive,
 } from "../repository/statements.js";
-import { addMultipleTransactions } from "../repository/transactions.js";
-import { extractTransactionsFromPDF } from "../services/transactions/transactionExtractor.js";
 import { decryptPdfTmp } from "./pdfDecrypter.js";
 
 export const getEmailMessages = async (gmail, query, maxResults = 10) => {
@@ -27,115 +25,54 @@ export const validateStatementPDFAndUploadToDrive = async (
   attachmentPart,
   fileName,
   message,
-  password,
-  resourceIdentifier = null,
-  statementId = null
+  password
 ) => {
-  const driveRes = await checkStatementExistsInDrive(drive, fileName);
-  // TEMPORARY: Skip Drive check to force extraction (for testing)
-  // if (driveRes) {
-  //   console.log("Statement pdf already exists in Drive:", driveRes);
-  //   return { driveRes, transactions: [] }; // { id, webViewLink, webContentLink }
-  // } else {
-  if (driveRes) {
+  // Check if PDF already exists in Drive
+  const existingDriveFile = await checkStatementExistsInDrive(drive, fileName);
+
+  if (existingDriveFile) {
+    console.log(`   ℹ️  PDF already in Drive: ${fileName}`);
     console.log(
-      "⚠️  Statement exists in Drive, but forcing extraction anyway (TEMP):",
-      fileName
+      `   ℹ️  Will check if statement metadata exists in Firebase...`
     );
-  } else {
-    console.log(
-      "Statement pdf not found in Drive, proceeding to upload:",
-      fileName
-    );
+    return { driveRes: existingDriveFile };
   }
 
-  // Always download and extract, even if already in Drive (TEMP for testing)
-  {
-    const attachmentId = attachmentPart.body?.attachmentId;
+  console.log(`   📥 Downloading attachment from email...`);
 
-    const attachment = await gmail.users.messages.attachments.get({
-      userId: "me",
-      messageId: message.id,
-      id: attachmentId,
-    });
-    const attachmentDataBuffer = attachment.data.data;
+  // Download attachment from Gmail
+  const attachmentId = attachmentPart.body?.attachmentId;
+  const attachment = await gmail.users.messages.attachments.get({
+    userId: "me",
+    messageId: message.id,
+    id: attachmentId,
+  });
 
-    fs.writeFileSync(
-      config.TEMP_PDF_PATH,
-      Buffer.from(attachmentDataBuffer, "base64")
-    );
+  // Save to temporary file
+  const attachmentBuffer = Buffer.from(attachment.data.data, "base64");
+  fs.writeFileSync(config.TEMP_PDF_PATH, attachmentBuffer);
+  console.log(
+    `   💾 Attachment saved temporarily (${(attachmentBuffer.length / 1024).toFixed(2)} KB)`
+  );
 
-    // Decrypt the PDF
-    const decryptedPdfBytes = await decryptPdfTmp(
-      config.TEMP_PDF_PATH,
-      password
-    );
+  // Decrypt the PDF
+  console.log(`   🔓 Decrypting PDF...`);
+  const decryptedPdfBytes = await decryptPdfTmp(config.TEMP_PDF_PATH, password);
+  console.log(`   ✅ PDF decrypted successfully`);
 
-    // Upload to Drive (only if not already there)
-    let res = driveRes;
-    if (!driveRes) {
-      res = await uploadPdfBytesToDrive(drive, decryptedPdfBytes, fileName);
-      console.log("✅ PDF uploaded to Drive:", fileName);
-    } else {
-      console.log("ℹ️  Using existing Drive file");
-    }
+  // Upload to Google Drive
+  console.log(`   ☁️  Uploading to Google Drive...`);
+  const driveFile = await uploadPdfBytesToDrive(
+    drive,
+    decryptedPdfBytes,
+    fileName
+  );
+  console.log(`   ✅ Uploaded to Drive: ${driveFile.id}`);
 
-    // Extract transactions from the PDF
-    let extractedTransactions = [];
-    try {
-      console.log("📊 Extracting transactions from PDF...");
-      const extractionResult = await extractTransactionsFromPDF(
-        config.TEMP_PDF_PATH,
-        password
-      );
+  // Clean up temporary file
+  fs.unlinkSync(config.TEMP_PDF_PATH);
 
-      console.log(
-        `✅ Extracted ${extractionResult.totalTransactions} transactions from ${extractionResult.bank} statement`
-      );
-
-      // Format transactions for database with deterministic IDs
-      if (resourceIdentifier && extractionResult.transactions.length > 0) {
-        extractedTransactions = extractionResult.transactions.map((txn) => {
-          // Generate deterministic ID based on actual resourceIdentifier
-          const idData = `${resourceIdentifier}|${txn.date}|${txn.description}|${txn.amount}|${txn.type}`;
-          const deterministicId = `txn_${crypto
-            .createHash("md5")
-            .update(idData)
-            .digest("hex")
-            .substring(0, 16)}`;
-
-          return {
-            id: deterministicId,
-            resourceIdentifier: resourceIdentifier,
-            statementId: statementId || message.id,
-            date: txn.date,
-            description: txn.description,
-            merchant: txn.merchant,
-            amount: txn.amount,
-            type: txn.type,
-            category: txn.category,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-        });
-
-        console.log(
-          `💾 Formatted ${extractedTransactions.length} transactions for database`
-        );
-      }
-    } catch (extractionError) {
-      console.error(
-        "⚠️  Error extracting transactions:",
-        extractionError.message
-      );
-      // Continue even if extraction fails - we still want to save the statement
-    }
-
-    // Clean up temp file
-    fs.unlinkSync(config.TEMP_PDF_PATH);
-
-    return { driveRes: res, transactions: extractedTransactions };
-  }
+  return { driveRes: driveFile };
 };
 
 export const prepareStatementObjectAndSaveInDB = async (
@@ -144,40 +81,46 @@ export const prepareStatementObjectAndSaveInDB = async (
   resourceIdentifier,
   driveRes,
   info,
-  statementData = {},
-  transactions = []
+  statementData = {}
 ) => {
-  if (!(await checkStatementExists(messageId))) {
-    await addStatement({
-      id: messageId,
-      resourceIdentifier,
-      driveFileId: driveRes.id,
-      driveFileWebViewLink: driveRes.webViewLink,
-      driveFileWebContentLink: driveRes.webContentLink,
-      period: {
-        start: info.startISO,
-        end: info.endISO,
-      },
-      statementData,
-    });
-    console.log("✅ Statement data processed and saved for:", subject);
+  const period = {
+    start: info.startISO,
+    end: info.endISO,
+  };
 
-    // Save transactions to database
-    if (transactions && transactions.length > 0) {
-      try {
-        console.log(
-          `💾 Saving ${transactions.length} transactions to database...`
-        );
-        await addMultipleTransactions(transactions);
-        console.log(
-          `✅ Successfully saved ${transactions.length} transactions`
-        );
-      } catch (error) {
-        console.error("❌ Error saving transactions:", error.message);
-        // Continue even if transaction save fails
-      }
-    }
-  } else {
-    console.log("⚠️  Statement data already exists, skipping:", subject);
+  console.log(`   🔍 Checking if statement exists in Firebase...`);
+
+  // Check for duplicate by period (primary check)
+  const existingByPeriod = await checkStatementExistsByPeriod(
+    resourceIdentifier,
+    period
+  );
+  if (existingByPeriod) {
+    console.log(
+      `   ✅ Statement metadata already exists in Firebase (${period.start} to ${period.end})`
+    );
+    return;
   }
+
+  // Check for duplicate by message ID (secondary check)
+  const existingByMessageId = await checkStatementExists(messageId);
+  if (existingByMessageId) {
+    console.log(
+      `   ✅ Statement metadata already exists in Firebase (message ID: ${messageId})`
+    );
+    return;
+  }
+
+  // Statement doesn't exist in Firebase, add it
+  console.log(`   💾 Statement metadata not found in Firebase, saving...`);
+  await addStatement({
+    id: messageId,
+    resourceIdentifier,
+    driveFileId: driveRes.id,
+    driveFileWebViewLink: driveRes.webViewLink,
+    driveFileWebContentLink: driveRes.webContentLink,
+    period,
+    statementData,
+  });
+  console.log(`   ✅ Statement metadata saved to Firebase`);
 };
