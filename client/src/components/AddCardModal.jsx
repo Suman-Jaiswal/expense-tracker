@@ -9,6 +9,7 @@ import {
   Row,
   Select,
   Space,
+  theme,
   Typography,
 } from "antd";
 import { useEffect, useState } from "react";
@@ -16,6 +17,7 @@ import { addCard, getBanksDropdownOptions } from "../api";
 import CardView from "./CardView";
 
 const { Text, Title } = Typography;
+const { useToken } = theme;
 
 /**
  * Props:
@@ -31,6 +33,7 @@ export default function AddCardModal({
   onClose = () => {},
   setResourceIdentifier,
 }) {
+  const { token } = useToken();
   const [form] = Form.useForm();
   // const [imagePreview, setImagePreview] = useState(null);
   // const [rawImageFile, setRawImageFile] = useState(null);
@@ -242,10 +245,10 @@ export default function AddCardModal({
         <Col xs={24} sm={14}>
           <div
             style={{
-              background: "#f8f9fa",
+              background: token.colorBgContainer,
               padding: "24px",
               borderRadius: "12px",
-              border: "1px solid #e9ecef",
+              border: `1px solid ${token.colorBorder}`,
             }}
           >
             <Form
