@@ -318,14 +318,14 @@ function extractIciciTransactions(text) {
   const transactions = [];
   const lines = text.split("\n").map((l) => l.trim());
 
-  // Pattern 1: DD/MM/YYYY followed by long ref number, description, and amount
-  // Format: DD/MM/YYYY{11-digit-ref}{Description}{1-2-digit-reward}{amount} [CR]
-  // Description can include letters, numbers, spaces, @, -, <, >, etc.
-  const pattern1 =
-    /^(\d{2}\/\d{2}\/\d{4})\d{11}(.+?)\d{1,2}([\d,]+\.\d{2})\s*(CR)?$/i;
+  // Pattern 1: Capture everything after ref number, then parse amount from end
+  // Format: DD/MM/YYYY{11-digit-ref}{Description+amount} [CR]
+  // We'll extract the amount manually from the captured text
+  const pattern1 = /^(\d{2}\/\d{2}\/\d{4})\d{11}(.+?)\s*(CR)?$/i;
 
-  // Pattern 2: DD-MMM-YY Description Amount (older format)
-  const pattern2 = /(\d{2}-[A-Z]{3}-\d{2})\s+(.*?)\s+([\d,]+\.\d{2})/i;
+  // Pattern 2: DD-MMM-YY Description Amount (older format with spaces)
+  const pattern2 =
+    /(\d{2}-[A-Z]{3}-\d{2})\s+(.*?)\s+([\d,]+\.?\d{0,2})\s*(CR)?$/i;
 
   let inTransactionSection = false;
 
@@ -356,28 +356,59 @@ function extractIciciTransactions(text) {
       // Try pattern 1 first (newer ICICI format with ref number)
       let match = line.match(pattern1);
       if (match) {
-        const [, date, description, amount, creditMarker] = match;
-        const { amount: parsedAmount, type: txnType } = parseAmount(
-          amount + (creditMarker || "")
-        );
+        const [, date, rest, creditMarker] = match;
 
-        transactions.push({
-          date: parseTransactionDate(date),
-          description: description.trim(),
-          merchant: extractMerchant(description),
-          amount: parsedAmount,
-          type: txnType,
-          category: categorizeTransaction(description),
-          rawText: line,
-        });
-        continue;
+        // Extract amount from the end of the rest string
+        // Amount is typically the last 3-8 contiguous digits
+        // Format could be: "DESCRIPTION1234567" or "DESCRIPTION 12 34567" or "DESCRIPTION581.93"
+        const amountMatch = rest.match(/([\d,]+\.?\d{0,2})\s*$/);
+
+        if (amountMatch) {
+          let amount = amountMatch[1];
+          // Description is everything before the amount
+          let description = rest.substring(0, rest.lastIndexOf(amount)).trim();
+
+          // Remove any trailing reward digits (1-2 digits) from description
+          description = description.replace(/\s*\d{1,2}\s*$/, "").trim();
+
+          // If amount doesn't have decimal, assume last 2 digits are paise
+          let amountStr = amount + (creditMarker || "");
+          if (!amount.includes(".") && amount.length > 2) {
+            const rupees = amount.slice(0, -2);
+            const paise = amount.slice(-2);
+            amountStr = `${rupees}.${paise}${creditMarker || ""}`;
+          }
+
+          const { amount: parsedAmount, type: txnType } =
+            parseAmount(amountStr);
+
+          transactions.push({
+            date: parseTransactionDate(date),
+            description: description.trim(),
+            merchant: extractMerchant(description),
+            amount: parsedAmount,
+            type: txnType,
+            category: categorizeTransaction(description),
+            rawText: line,
+          });
+          continue;
+        }
       }
 
-      // Try pattern 2 (older ICICI format)
+      // Try pattern 2 (older ICICI format with clear spaces)
       match = line.match(pattern2);
       if (match) {
-        const [, date, description, amount] = match;
-        const { amount: parsedAmount, type: txnType } = parseAmount(amount);
+        const [, date, description, amount, creditMarker] = match;
+        let amountStr = amount + (creditMarker || "");
+
+        // If amount doesn't have decimal, assume last 2 digits are paise
+        if (!amount.includes(".") && amount.length > 2) {
+          const rupees = amount.slice(0, -2);
+          const paise = amount.slice(-2);
+          amountStr = `${rupees}.${paise}${creditMarker || ""}`;
+        }
+
+        const { amount: parsedAmount, type: txnType } = parseAmount(amountStr);
 
         transactions.push({
           date: parseTransactionDate(date),

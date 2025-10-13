@@ -70,12 +70,14 @@ expense-tracker/
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone <your-repo-url>
    cd expense-tracker
    ```
 
 2. **Install dependencies**
+
    ```bash
    # Install server dependencies
    cd server
@@ -91,20 +93,21 @@ expense-tracker/
    Create `.env` files:
 
    **Server** (`server/.env`):
+
    ```env
    PORT=4000
    NODE_ENV=development
-   
+
    # Firebase Configuration
    FIREBASE_API_KEY=your_api_key
    FIREBASE_AUTH_DOMAIN=your_auth_domain
    FIREBASE_PROJECT_ID=your_project_id
-   
+
    # PDF Passwords (for encrypted statements)
    AXIS_PDF_PASSWORD=your_password
    ICICI_PDF_PASSWORD=your_password
    SBI_PDF_PASSWORD=your_password
-   
+
    # Google OAuth
    GOOGLE_CLIENT_ID=your_client_id
    GOOGLE_CLIENT_SECRET=your_client_secret
@@ -112,6 +115,7 @@ expense-tracker/
    ```
 
    **Client** (`client/.env`):
+
    ```env
    REACT_APP_API_URL=http://localhost:4000
    REACT_APP_FIREBASE_API_KEY=your_api_key
@@ -124,14 +128,14 @@ expense-tracker/
    ```
 
 4. **Setup Google Cloud Credentials**
-   
+
    - Create a project in [Google Cloud Console](https://console.cloud.google.com)
    - Enable Gmail API and Drive API
    - Create OAuth 2.0 credentials
    - Download `credentials.json` and place it in the `server/` directory
 
 5. **Firebase Setup**
-   
+
    - Create a Firebase project at [Firebase Console](https://console.firebase.google.com)
    - Enable Firestore Database
    - Add your app to Firebase and get configuration
@@ -140,17 +144,21 @@ expense-tracker/
 ### Running the Application
 
 1. **Start the backend server**
+
    ```bash
    cd server
    npm run dev
    ```
+
    The server will run on `http://localhost:4000`
 
 2. **Start the frontend** (in a new terminal)
+
    ```bash
    cd client
    npm start
    ```
+
    The app will open at `http://localhost:3000`
 
 3. **First-time OAuth Setup**
@@ -162,20 +170,21 @@ expense-tracker/
 
 ### Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/` | Health check |
-| GET | `/sync-statements` | Fetch all statements from Gmail |
-| GET | `/sync-cards` | Initialize/sync credit card data |
-| GET | `/sync-tnxs` | Sync transactions |
-| POST | `/transactions` | Add multiple transactions |
-| DELETE | `/delete-statements` | Delete all statements |
-| DELETE | `/delete-cards` | Delete all cards |
-| DELETE | `/delete-tnxs` | Delete all transactions |
+| Method | Endpoint             | Description                      |
+| ------ | -------------------- | -------------------------------- |
+| GET    | `/`                  | Health check                     |
+| GET    | `/sync-statements`   | Fetch all statements from Gmail  |
+| GET    | `/sync-cards`        | Initialize/sync credit card data |
+| GET    | `/sync-tnxs`         | Sync transactions                |
+| POST   | `/transactions`      | Add multiple transactions        |
+| DELETE | `/delete-statements` | Delete all statements            |
+| DELETE | `/delete-cards`      | Delete all cards                 |
+| DELETE | `/delete-tnxs`       | Delete all transactions          |
 
 ### Data Models
 
 **Card**
+
 ```javascript
 {
   id: "BANK_XXXXXX",
@@ -197,6 +206,7 @@ expense-tracker/
 ```
 
 **Transaction**
+
 ```javascript
 {
   id: "unique_id",
@@ -213,10 +223,12 @@ expense-tracker/
 ### Available Scripts
 
 **Server:**
+
 - `npm start` - Start production server
 - `npm run dev` - Start development server with nodemon
 
 **Client:**
+
 - `npm start` - Start development server
 - `npm run build` - Build for production
 - `npm test` - Run tests
@@ -266,11 +278,11 @@ npm test -- --coverage
 
 ## 📝 Supported Banks
 
-| Bank | Status | Statement Format |
-|------|--------|------------------|
-| ICICI | ✅ Active | Encrypted PDF |
-| Axis Bank | ✅ Active | Encrypted PDF |
-| SBI Card | ⚠️ Disabled | Encrypted PDF |
+| Bank      | Status      | Statement Format |
+| --------- | ----------- | ---------------- |
+| ICICI     | ✅ Active   | Encrypted PDF    |
+| Axis Bank | ✅ Active   | Encrypted PDF    |
+| SBI Card  | ⚠️ Disabled | Encrypted PDF    |
 
 ## 🤝 Contributing
 
