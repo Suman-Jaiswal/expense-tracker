@@ -33,7 +33,7 @@ export const config = {
       emailQuery: `from:(cc.statements@axisbank.com) subject:("Flipkart Axis Bank Credit Card Statement") newer_than:${365}d`,
     },
     ICICI: {
-      enabled: false,
+      enabled: true,
       label: "ICICI Card",
       identifierPrefix: "card_ICICI_",
       pdfPassword: process.env.ICICI_PDF_PASSWORD || "",

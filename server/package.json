@@ -14,8 +14,6 @@
     "format:check": "prettier --check \"**/*.{js,jsx,json,md}\""
   },
   "dependencies": {
-    "base64url": "^3.0.1",
-    "cheerio": "^1.1.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
@@ -26,9 +24,7 @@
     "node-qpdf": "^1.0.3",
     "open": "^10.2.0",
     "patch-package": "^8.0.0",
-    "pdf-lib": "^1.17.1",
     "pdf-parse": "^1.1.1",
-    "pdf2json": "^3.2.0",
     "server-destroy": "^1.0.1"
   },
   "keywords": [

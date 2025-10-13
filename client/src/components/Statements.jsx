@@ -125,11 +125,14 @@ export default function Statements({ view = "tab", cardSelected }) {
   };
 
   const formatDate = (dateStr) => {
-    if (!dateStr) return "N/A";
+    if (!dateStr || dateStr === "undefined") return "N/A";
     try {
-      return format(new Date(dateStr), "MMM yyyy");
+      const date = new Date(dateStr);
+      // Check if date is valid
+      if (isNaN(date.getTime())) return "N/A";
+      return format(date, "MMM yyyy");
     } catch {
-      return dateStr;
+      return "N/A";
     }
   };
 

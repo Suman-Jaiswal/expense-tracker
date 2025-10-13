@@ -152,6 +152,56 @@ export function startServer() {
       );
 
       // Transaction endpoints
+      app.get(
+        "/transactions/debug",
+        asyncHandler(async (req, res) => {
+          const { getTransactions } = await import(
+            "./src/repository/transactions.js"
+          );
+          const allTransactions = await getTransactions();
+
+          // Calculate stats
+          const totalCount = allTransactions.length;
+          const totalAmount = allTransactions.reduce(
+            (sum, t) => sum + (parseFloat(t.amount) || 0),
+            0
+          );
+          const byType = allTransactions.reduce((acc, t) => {
+            acc[t.type] = (acc[t.type] || 0) + 1;
+            return acc;
+          }, {});
+          const byMonth = allTransactions.reduce((acc, t) => {
+            const month = t.date ? t.date.substring(0, 7) : "unknown";
+            acc[month] = (acc[month] || 0) + 1;
+            return acc;
+          }, {});
+
+          // Find top amounts (to identify problem transactions)
+          const topAmounts = allTransactions
+            .sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount))
+            .slice(0, 10)
+            .map((t) => ({
+              amount: t.amount,
+              description: t.description,
+              date: t.date,
+              type: t.type,
+            }));
+
+          res.json({
+            success: true,
+            summary: {
+              totalTransactions: totalCount,
+              totalAmount: totalAmount.toFixed(2),
+              byType,
+              byMonth,
+              topAmounts, // NEW: Show top 10 amounts
+            },
+            sampleTransactions: allTransactions.slice(0, 5),
+            timestamp: new Date().toISOString(),
+          });
+        })
+      );
+
       app.post(
         "/transactions",
         asyncHandler(async (req, res) => {
@@ -201,13 +251,13 @@ export function startServer() {
 
       app.listen(PORT, () => {
         console.log(`
-╔═══════════════════════════════════════════════╗
-║   💰 Expense Tracker API Server              ║
-║                                               ║
-║   🚀 Server running on port ${PORT}            ║
+╔══════════════════════════════════════════════╗
+║   💰 EXPENSE TRACKER API SERVER              ║
+║                                              ║
+║   🚀 Server running on port ${PORT}             ║
 ║   🌍 Environment: ${NODE_ENV.padEnd(27)}║
-║   📅 Started: ${new Date().toISOString().substring(0, 19)} ║
-╚═══════════════════════════════════════════════╝
+║   📅 Started: ${new Date().toISOString().substring(0, 19)}            ║
+╚══════════════════════════════════════════════╝
         `);
       });
     })

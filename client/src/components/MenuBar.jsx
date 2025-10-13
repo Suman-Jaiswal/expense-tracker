@@ -1,11 +1,9 @@
 import {
-  BankTwoTone,
   BulbOutlined,
   BulbTwoTone,
   DashboardTwoTone,
-  DownCircleTwoTone,
+  DollarCircleTwoTone,
   FilePdfTwoTone,
-  PlusCircleTwoTone,
   WalletTwoTone,
 } from "@ant-design/icons";
 import { Button, Layout, Menu, Switch, Tooltip } from "antd";
@@ -24,9 +22,7 @@ function getItem(type = "item", label, key, icon, children) {
 
 export default function MenuBar({ resources, setResourceIdentifier }) {
   const { isDarkMode, toggleTheme } = useTheme();
-  const [collapsed, setCollapsed] = useState(
-    window.innerWidth < 768 ? true : false
-  );
+  const [collapsed, setCollapsed] = useState(true);
   const [items, setItems] = useState([]);
   const [selectedKey, setSelectedKey] = useState(["dashboard"]);
   const hasSetInitialResource = useRef(false);
@@ -37,13 +33,17 @@ export default function MenuBar({ resources, setResourceIdentifier }) {
         getItem("item", "Dashboard", "dashboard", <DashboardTwoTone />),
         resources.cards?.length > 0 &&
           getItem("item", "Credit Cards", "credit_cards", <WalletTwoTone />),
-        resources.accounts?.length > 0 &&
-          getItem("item", "Accounts", "accounts", <BankTwoTone />),
+        getItem(
+          "item",
+          "Transactions",
+          "transactions",
+          <DollarCircleTwoTone />
+        ),
         getItem("item", "Statements", "statements", <FilePdfTwoTone />),
-        getItem("item", "Actions", "actions", <DownCircleTwoTone />, [
-          getItem("item", "Add Card", "add_card", <PlusCircleTwoTone />),
-          getItem("item", "Add Account", "add_account", <PlusCircleTwoTone />),
-        ]),
+        // Disabled for now
+        // resources.accounts?.length > 0 &&
+        //   getItem("item", "Accounts", "accounts", <BankTwoTone />),
+        // Actions removed - Add Card button now in Cards page
       ].filter(Boolean),
 
     [resources]

@@ -413,6 +413,19 @@ body.dark-mode .ant-statistic-content {
   background: var(--bg-secondary);
 }
 
+/* Remove border radius from main content containers */
+.ant-layout-content {
+  border-radius: 0 !important;
+}
+
+.ant-tabs > .ant-tabs-content-holder {
+  border-radius: 0 !important;
+}
+
+.ant-tabs-content {
+  border-radius: 0 !important;
+}
+
 .ant-card {
   border-radius: 12px;
   box-shadow: var(--shadow-sm);

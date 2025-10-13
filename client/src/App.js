@@ -11,7 +11,7 @@ const { Content } = Layout;
 
 const App = () => {
   const {
-    token: { colorBgContainer, borderRadiusLG },
+    token: { colorBgContainer },
   } = theme.useToken();
 
   const { state, actions } = useApp();
@@ -73,7 +73,7 @@ const App = () => {
               padding: "0 0",
               minHeight: 280,
               background: colorBgContainer,
-              borderRadius: borderRadiusLG,
+              borderRadius: 0,
             }}
           >
             <ContentPage

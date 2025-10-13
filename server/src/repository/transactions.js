@@ -26,7 +26,9 @@ export const addTransaction = async (transaction) => {
   console.log("Transaction added with id:", id);
 };
 export const getTransactions = async () => {
-  // Implement fetching transactions if needed
+  const snapshot = await getDocs(transactionsCollection);
+  const transactionsList = snapshot.docs.map((doc) => doc.data());
+  return transactionsList;
 };
 export const updateTransaction = async (id, updatedData) => {
   // Implement updating a transaction if needed

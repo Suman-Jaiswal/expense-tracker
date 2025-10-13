@@ -4,7 +4,7 @@ import {
   CreditCardOutlined,
   TransactionOutlined,
 } from "@ant-design/icons";
-import { Card, Col, Row, Statistic, Table, Tag, theme } from "antd";
+import { Card, Col, Row, Statistic, Table, Tag, theme, Typography } from "antd";
 import { format } from "date-fns";
 import { useEffect, useState } from "react";
 import {
@@ -129,8 +129,22 @@ const Dashboard = ({ resources }) => {
 
   return (
     <div
-      style={{ padding: "24px", background: colorBgLayout, minHeight: "100vh" }}
+      style={{
+        padding: "24px",
+        background: colorBgLayout,
+        minHeight: "100vh",
+      }}
     >
+      {/* Header Section */}
+      <div style={{ marginBottom: 24 }}>
+        <Typography.Title level={2} style={{ margin: 0 }}>
+          📊 Dashboard
+        </Typography.Title>
+        <Typography.Text type="secondary">
+          Overview of your expenses and spending patterns
+        </Typography.Text>
+      </div>
+
       {/* Summary Cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={12} lg={6}>

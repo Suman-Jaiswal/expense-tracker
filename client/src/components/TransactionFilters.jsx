@@ -24,7 +24,12 @@ import { exportToCSV, exportToJSON } from "../utils/exportData";
 
 const { RangePicker } = DatePicker;
 
-const TransactionFilters = ({ onFilterChange, cards, transactions }) => {
+const TransactionFilters = ({
+  onFilterChange,
+  cards,
+  transactions,
+  hideCardFilter = false,
+}) => {
   const [searchText, setSearchText] = useState("");
   const [selectedCard, setSelectedCard] = useState(null);
   const [dateRange, setDateRange] = useState(null);
@@ -216,23 +221,25 @@ const TransactionFilters = ({ onFilterChange, cards, transactions }) => {
               />
             </Col>
 
-            {/* Card Filter */}
-            <Col xs={24} sm={12} md={8}>
-              <Select
-                placeholder="Select Card"
-                style={{ width: "100%" }}
-                value={selectedCard}
-                onChange={setSelectedCard}
-                allowClear
-                options={[
-                  { label: "All Cards", value: null },
-                  ...(cards?.map((card) => ({
-                    label: card.id,
-                    value: card.resourceIdentifier,
-                  })) || []),
-                ]}
-              />
-            </Col>
+            {/* Card Filter - Hidden when viewing specific card */}
+            {!hideCardFilter && (
+              <Col xs={24} sm={12} md={8}>
+                <Select
+                  placeholder="Select Card"
+                  style={{ width: "100%" }}
+                  value={selectedCard}
+                  onChange={setSelectedCard}
+                  allowClear
+                  options={[
+                    { label: "All Cards", value: null },
+                    ...(cards?.map((card) => ({
+                      label: card.id,
+                      value: card.resourceIdentifier,
+                    })) || []),
+                  ]}
+                />
+              </Col>
+            )}
 
             {/* Transaction Type */}
             <Col xs={24} sm={12} md={8}>

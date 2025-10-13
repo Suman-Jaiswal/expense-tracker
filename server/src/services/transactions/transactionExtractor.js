@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import pdf from "pdf-parse";
 import { decryptPdfTmp } from "../../utils/pdfDecrypter.js";
 
@@ -5,6 +6,21 @@ import { decryptPdfTmp } from "../../utils/pdfDecrypter.js";
  * Transaction Extractor Service
  * Extracts transactions from credit card statement PDFs
  */
+
+/**
+ * Generate a deterministic transaction ID based on transaction content
+ * This ensures same transaction always gets same ID (prevents duplicates)
+ */
+function generateTransactionId(
+  resourceIdentifier,
+  date,
+  description,
+  amount,
+  type
+) {
+  const data = `${resourceIdentifier}|${date}|${description}|${amount}|${type}`;
+  return `txn_${crypto.createHash("md5").update(data).digest("hex").substring(0, 16)}`;
+}
 
 // Common transaction keywords for different banks
 const TRANSACTION_MARKERS = {
@@ -486,12 +502,18 @@ export async function extractTransactionsFromPDF(pdfPath, password = null) {
 
     console.log(`✅ Extracted ${transactions.length} transactions`);
 
-    // Add metadata
+    // Add metadata with deterministic IDs
     const result = {
       bank,
       totalTransactions: transactions.length,
-      transactions: transactions.map((txn, index) => ({
-        id: `txn_${Date.now()}_${index}`,
+      transactions: transactions.map((txn) => ({
+        id: generateTransactionId(
+          "temp", // Will be replaced with actual resourceIdentifier later
+          txn.date,
+          txn.description,
+          txn.amount,
+          txn.type
+        ),
         ...txn,
       })),
       extractedAt: new Date().toISOString(),
@@ -525,8 +547,14 @@ export function extractTransactionsFromText(text) {
   return {
     bank,
     totalTransactions: transactions.length,
-    transactions: transactions.map((txn, index) => ({
-      id: `txn_${Date.now()}_${index}`,
+    transactions: transactions.map((txn) => ({
+      id: generateTransactionId(
+        "temp", // Will be replaced with actual resourceIdentifier later
+        txn.date,
+        txn.description,
+        txn.amount,
+        txn.type
+      ),
       ...txn,
     })),
     extractedAt: new Date().toISOString(),

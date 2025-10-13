@@ -4,6 +4,26 @@ import { useState } from "react";
 
 export default function CardView({ content = {} }) {
   const [copied, setCopied] = useState(false);
+
+  // Helper to get bank logo/initial
+  const getBankLogo = (bankName) => {
+    const bank = (bankName || "").toLowerCase();
+    if (bank.includes("axis")) return "AXIS";
+    if (bank.includes("icici")) return "ICICI";
+    if (bank.includes("hdfc")) return "HDFC";
+    if (bank.includes("sbi")) return "SBI";
+    return bankName?.substring(0, 4).toUpperCase() || "BANK";
+  };
+
+  // Helper to get partner logo/name
+  const getPartnerLogo = (cardName) => {
+    const name = (cardName || "").toLowerCase();
+    if (name.includes("flipkart")) return "flipkart";
+    if (name.includes("amazon")) return "amazon";
+    if (name.includes("myntra")) return "myntra";
+    return null;
+  };
+
   const previewCardNumber = (number) => {
     if (!number) return "**** **** **** ****";
     const digits = number.replace(/\D/g, "");
@@ -53,9 +73,8 @@ export default function CardView({ content = {} }) {
         borderRadius: 16,
         background: "linear-gradient(135deg, #1e293b 0%, #334155 100%)",
         color: "#fff",
-        height: 200,
+        height: 240,
         width: "100%",
-        maxWidth: 380,
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
@@ -97,9 +116,46 @@ export default function CardView({ content = {} }) {
               background: "linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
+              marginBottom: 8,
             }}
           >
             {content.cardName || "Card"}
+          </div>
+          {/* Bank and Partner Logos */}
+          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+            {getPartnerLogo(content.cardName) && (
+              <div
+                style={{
+                  padding: "3px 8px",
+                  background: "rgba(255, 255, 255, 0.95)",
+                  borderRadius: 4,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#6366f1",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                  boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                }}
+              >
+                {getPartnerLogo(content.cardName)}
+              </div>
+            )}
+            <div
+              style={{
+                padding: "3px 8px",
+                background: "rgba(255, 255, 255, 0.15)",
+                border: "1px solid rgba(255, 255, 255, 0.3)",
+                borderRadius: 4,
+                fontSize: 9,
+                fontWeight: 700,
+                color: "#fff",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+                backdropFilter: "blur(10px)",
+              }}
+            >
+              {getBankLogo(content.bankName)}
+            </div>
           </div>
         </div>
         <div

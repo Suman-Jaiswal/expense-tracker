@@ -35,6 +35,7 @@ export default function ResourceList({
   resource = [],
   resourceType = "cards",
   resourceTitle = "Credit Cards",
+  setResourceIdentifier,
 }) {
   const {
     token: { colorBgLayout },
@@ -198,13 +199,34 @@ export default function ResourceList({
       ) : (
         <>
           {/* Header Section */}
-          <div style={{ marginBottom: 24 }}>
-            <Title level={2} style={{ margin: 0 }}>
-              💳 {resourceTitle}
-            </Title>
-            <Text type="secondary">
-              Manage your credit cards and track spending limits
-            </Text>
+          <div
+            style={{
+              marginBottom: 24,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 16,
+            }}
+          >
+            <div>
+              <Title level={2} style={{ margin: 0 }}>
+                💳 {resourceTitle}
+              </Title>
+              <Text type="secondary">
+                Manage your credit cards and track spending limits
+              </Text>
+            </div>
+            {resourceType === "cards" && setResourceIdentifier && (
+              <Button
+                type="primary"
+                size="large"
+                icon={<PlusOutlined />}
+                onClick={() => setResourceIdentifier("add_card")}
+              >
+                Add Card
+              </Button>
+            )}
           </div>
 
           {/* Statistics Cards for Credit Cards */}

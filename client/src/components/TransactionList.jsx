@@ -1,4 +1,13 @@
-import { Empty, Spin, Statistic, Table, Tag, Tooltip } from "antd";
+import {
+  Empty,
+  Spin,
+  Statistic,
+  Table,
+  Tag,
+  Tooltip,
+  Typography,
+  theme,
+} from "antd";
 import { format } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
 import { Toaster } from "react-hot-toast";
@@ -12,7 +21,12 @@ import {
 import { formatCurrency } from "../utils/dataAggregation";
 import TransactionFilters from "./TransactionFilters";
 
-export default function TransactionList() {
+const { Title, Text } = Typography;
+
+export default function TransactionList({ resourceIdentifier }) {
+  const {
+    token: { colorBgLayout },
+  } = theme.useToken();
   const { state } = useApp();
   const { resources } = state;
   const [transactions, setTransactions] = useState([]);
@@ -22,14 +36,24 @@ export default function TransactionList() {
 
   useEffect(() => {
     fetchTransactions();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resourceIdentifier]); // Re-fetch when resourceIdentifier changes
 
   const fetchTransactions = async () => {
     try {
       setLoading(true);
       const data = await getAllTransactions();
-      setTransactions(data || []);
-      setFilteredTransactions(data || []);
+
+      // Filter by resourceIdentifier if provided (from card selection)
+      let filteredData = data || [];
+      if (resourceIdentifier) {
+        filteredData = filteredData.filter(
+          (tx) => tx.resourceIdentifier === resourceIdentifier
+        );
+      }
+
+      setTransactions(filteredData);
+      setFilteredTransactions(filteredData);
     } catch (error) {
       console.error("Error fetching transactions:", error);
     } finally {
@@ -148,6 +172,7 @@ export default function TransactionList() {
       dataIndex: "category",
       key: "category",
       width: 140,
+      sorter: (a, b) => (a.category || "").localeCompare(b.category || ""),
       render: (text) => {
         const icon = getCategoryIcon(text);
         const color = getCategoryColor(text);
@@ -192,31 +217,102 @@ export default function TransactionList() {
         { text: "Credit", value: "credit" },
       ],
       onFilter: (value, record) => record.type === value,
+      sorter: (a, b) => (a.type || "").localeCompare(b.type || ""),
       render: (type) => (
         <Tag color={type === "credit" ? "green" : "red"}>
           {type?.toUpperCase()}
         </Tag>
       ),
     },
+    // Only show Card column when viewing all transactions (not filtered by specific card)
+    ...(!resourceIdentifier
+      ? [
+          {
+            title: "Card",
+            dataIndex: "resourceIdentifier",
+            key: "resourceIdentifier",
+            width: 150,
+            ellipsis: true,
+            render: (text) => (
+              <span style={{ fontSize: 12 }}>{text || "N/A"}</span>
+            ),
+          },
+        ]
+      : []),
     {
-      title: "Card",
-      dataIndex: "resourceIdentifier",
-      key: "resourceIdentifier",
-      width: 150,
-      ellipsis: true,
-      render: (text) => <span style={{ fontSize: 12 }}>{text || "N/A"}</span>,
+      title: "Created",
+      dataIndex: "createdAt",
+      key: "createdAt",
+      width: 130,
+      sorter: (a, b) => {
+        const dateA = new Date(a.createdAt);
+        const dateB = new Date(b.createdAt);
+        if (isNaN(dateA.getTime())) return 1;
+        if (isNaN(dateB.getTime())) return -1;
+        return dateA - dateB;
+      },
+      render: (date) => {
+        if (!date) return "N/A";
+        try {
+          const dateObj = new Date(date);
+          if (isNaN(dateObj.getTime())) return "N/A";
+          return format(dateObj, "MMM dd, HH:mm");
+        } catch (error) {
+          return "N/A";
+        }
+      },
     },
   ];
 
   return (
-    <div style={{ padding: "24px" }}>
+    <div
+      style={{
+        padding: "24px",
+        background: colorBgLayout,
+        minHeight: "100vh",
+      }}
+    >
       <Toaster position="top-right" />
+
+      {/* Header Section - Only show when NOT viewing specific card */}
+      {!resourceIdentifier && (
+        <div style={{ marginBottom: 24 }}>
+          <Title level={2} style={{ margin: 0 }}>
+            💰 Transactions
+          </Title>
+          <Text type="secondary">
+            View and manage all your transactions across all cards
+          </Text>
+        </div>
+      )}
+
+      {/* Card Indicator when viewing specific card */}
+      {resourceIdentifier && (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: "12px 16px",
+            background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+            borderRadius: 8,
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <span style={{ fontSize: 18 }}>💳</span>
+          <span style={{ fontWeight: 600 }}>
+            Showing transactions for: {resourceIdentifier}
+          </span>
+        </div>
+      )}
 
       {/* Filters */}
       <TransactionFilters
         onFilterChange={handleFilterChange}
         cards={resources?.cards || []}
         transactions={filteredTransactions}
+        hideCardFilter={!!resourceIdentifier} // Hide card filter when viewing specific card
       />
 
       {/* Summary Stats */}

@@ -99,9 +99,15 @@ export default function GoogleLoginOnly({ children }) {
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
+              background: isDarkMode
+                ? "linear-gradient(135deg, #1e293b 0%, #334155 100%)"
+                : "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)",
               borderBottom: isDarkMode
-                ? "1px solid #434343"
-                : "1px solid #f0f0f0",
+                ? "2px solid #475569"
+                : "1px solid #e2e8f0",
+              position: "sticky",
+              top: 0,
+              zIndex: 999,
             }}
           >
             <div

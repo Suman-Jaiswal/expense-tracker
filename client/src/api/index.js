@@ -86,3 +86,42 @@ export const deleteCard = async (cardId) => {
   await setDoc(doc(db, "cards", cardId), { deleted: true }, { merge: true });
   return { success: true };
 };
+
+export const updateCard = async (cardId, updates) => {
+  const cardRef = doc(db, "cards", cardId);
+  const updateData = {
+    creditLimit: updates.creditLimit?.toString() || "0",
+    outstanding: updates.outstanding?.toString() || "0",
+    availableCredit: (
+      (parseFloat(updates.creditLimit) || 0) -
+      (parseFloat(updates.outstanding) || 0)
+    ).toString(),
+    billingDate: updates.billingDate?.toString() || "1",
+    dueDate: updates.dueDate?.toString() || "1",
+    metaData: {
+      cardName: updates.cardName || "",
+      cardType: updates.cardType || "",
+      ...updates.metaData,
+    },
+    updatedAt: new Date().toISOString(),
+  };
+  await setDoc(cardRef, updateData, { merge: true });
+  return { success: true };
+};
+
+export const updateBankAccount = async (accountId, updates) => {
+  const accountRef = doc(db, "accounts", accountId);
+  const updateData = {
+    balance: updates.balance?.toString() || "0",
+    metaData: {
+      accountName: updates.accountName || "",
+      accountNumber: updates.accountNumber || "",
+      ifscCode: updates.ifscCode || "",
+      branch: updates.branch || "",
+      ...updates.metaData,
+    },
+    updatedAt: new Date().toISOString(),
+  };
+  await setDoc(accountRef, updateData, { merge: true });
+  return { success: true };
+};

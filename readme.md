@@ -19,6 +19,8 @@ expense-tracker/
 ├── client/                 # React frontend
 │   ├── src/
 │   │   ├── components/    # React components
+│   │   ├── context/       # React Context (state management)
+│   │   ├── utils/         # Utility functions
 │   │   ├── api/          # API integration layer
 │   │   ├── firebase.js   # Firebase configuration
 │   │   └── App.js        # Main application
@@ -29,15 +31,32 @@ expense-tracker/
 │   │   ├── auth/         # Google OAuth authentication
 │   │   ├── repository/   # Database layer (Firestore)
 │   │   ├── services/     # Business logic
-│   │   │   ├── creditCards/
-│   │   │   └── bankAccounts/
+│   │   │   ├── creditCards/       # Statement fetching & processing
+│   │   │   ├── bankAccounts/      # Bank account management
+│   │   │   └── transactions/      # PDF transaction extraction
+│   │   ├── middleware/   # Express middleware
+│   │   ├── routes/       # API routes
 │   │   ├── utils/        # PDF parsing utilities
 │   │   └── config.js     # Configuration
 │   ├── server.js         # Express server
 │   └── package.json
 │
+├── docs/                  # 📚 Documentation
+│   ├── CONTRIBUTING.md
+│   ├── FEATURE_SUGGESTIONS.md
+│   ├── IMPLEMENTATION_SUMMARY.md
+│   ├── MODERNIZATION_SUMMARY.md
+│   ├── PROJECT_CLEANUP_SUMMARY.md
+│   ├── QUICK_START_SYNC.md
+│   ├── TRANSACTION_EXTRACTION_GUIDE.md
+│   └── TRANSACTION_EXTRACTION_INTEGRATION.md
+│
+├── .github/               # GitHub Actions CI/CD
+├── docker-compose.yml     # Docker orchestration
 └── README.md
 ```
+
+> **📚 More Documentation**: Check the [`docs/`](./docs) folder for detailed guides on setup, features, and development.
 
 ## 🚀 Getting Started
 

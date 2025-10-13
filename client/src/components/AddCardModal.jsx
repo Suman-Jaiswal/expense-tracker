@@ -11,11 +11,11 @@ import {
   Space,
   Typography,
 } from "antd";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { addCard, getBanksDropdownOptions } from "../api";
 import CardView from "./CardView";
 
-const { Text } = Typography;
+const { Text, Title } = Typography;
 
 /**
  * Props:
@@ -194,10 +194,21 @@ export default function AddCardModal({
   }, []);
 
   return (
-    <div style={{ padding: "16px" }}>
+    <div style={{ padding: "24px", maxWidth: 1200, margin: "0 auto" }}>
       {contextHolder}
+
+      {/* Page Header */}
+      <div style={{ marginBottom: 32 }}>
+        <Title level={2} style={{ margin: 0 }}>
+          Add New Card
+        </Title>
+        <Text type="secondary">
+          Enter your card details below to add it to your wallet
+        </Text>
+      </div>
+
       <Row gutter={24}>
-        <Col xs={24} sm={8}>
+        <Col xs={24} sm={10}>
           {/* Card visual preview */}
 
           <div
@@ -229,135 +240,153 @@ export default function AddCardModal({
         </Col>
 
         <Col xs={24} sm={14}>
-          <Form
-            layout="vertical"
-            form={form}
-            onFinish={onFinish}
-            initialValues={{
-              cardNumber: "",
-              expiry: "",
-              cvv: "",
+          <div
+            style={{
+              background: "#f8f9fa",
+              padding: "24px",
+              borderRadius: "12px",
+              border: "1px solid #e9ecef",
             }}
           >
-            <Form.Item
-              label="Card number"
-              name="cardNumber"
-              rules={[
-                { required: true, message: "Card number is required" },
-                {
-                  validator: (_, value) => {
-                    const raw = (value || "").replace(/\s+/g, "");
-                    if (!raw) return Promise.reject();
-                    if (!/^\d{13,19}$/.test(raw)) {
-                      return Promise.reject(
-                        "Card number must contain 13–19 digits"
-                      );
-                    }
-                    return Promise.resolve();
+            <Form
+              layout="vertical"
+              form={form}
+              onFinish={onFinish}
+              initialValues={{
+                cardNumber: "",
+                expiry: "",
+                cvv: "",
+              }}
+            >
+              <Form.Item
+                label="Card number"
+                name="cardNumber"
+                rules={[
+                  { required: true, message: "Card number is required" },
+                  {
+                    validator: (_, value) => {
+                      const raw = (value || "").replace(/\s+/g, "");
+                      if (!raw) return Promise.reject();
+                      if (!/^\d{13,19}$/.test(raw)) {
+                        return Promise.reject(
+                          "Card number must contain 13–19 digits"
+                        );
+                      }
+                      return Promise.resolve();
+                    },
                   },
-                },
-              ]}
-            >
-              <Input
-                placeholder="1234 5678 9012 3456"
-                onChange={handleCardInputChange}
-                maxLength={19 + 3} // spaces
-                inputMode="numeric"
-              />
-            </Form.Item>
+                ]}
+              >
+                <Input
+                  placeholder="1234 5678 9012 3456"
+                  onChange={handleCardInputChange}
+                  maxLength={19 + 3} // spaces
+                  inputMode="numeric"
+                />
+              </Form.Item>
 
-            <Form.Item
-              label="Card Name"
-              name="cardName"
-              rules={[{ required: true, message: "Card Name is required" }]}
-            >
-              <Input
-                placeholder="Amazon Pay"
-                maxLength={19 + 3} // spaces
-                inputMode="text"
-              />
-            </Form.Item>
+              <Form.Item
+                label="Card Name"
+                name="cardName"
+                rules={[{ required: true, message: "Card Name is required" }]}
+              >
+                <Input
+                  placeholder="Amazon Pay"
+                  maxLength={19 + 3} // spaces
+                  inputMode="text"
+                />
+              </Form.Item>
 
-            {/* cardType and bankName */}
+              {/* cardType and bankName */}
 
-            <Row gutter={12}>
-              <Col span={12}>
-                <Form.Item
-                  label="Card Type"
-                  name="cardType"
-                  rules={[{ required: true, message: "Card Type is required" }]}
-                >
-                  <Radio.Group>
-                    <Radio value="credit">Credit</Radio>
-                    <Radio value="debit">Debit</Radio>
-                  </Radio.Group>
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  label="Bank Name"
-                  name="bankName"
-                  rules={[{ required: true, message: "Bank Name is required" }]}
-                >
-                  <Select
-                    placeholder="Select bank..."
-                    options={[...banksDropdownOptions]}
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
+              <Row gutter={12}>
+                <Col span={12}>
+                  <Form.Item
+                    label="Card Type"
+                    name="cardType"
+                    rules={[
+                      { required: true, message: "Card Type is required" },
+                    ]}
+                  >
+                    <Radio.Group>
+                      <Radio value="credit">Credit</Radio>
+                      <Radio value="debit">Debit</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    label="Bank Name"
+                    name="bankName"
+                    rules={[
+                      { required: true, message: "Bank Name is required" },
+                    ]}
+                  >
+                    <Select
+                      placeholder="Select bank..."
+                      options={[...banksDropdownOptions]}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
 
-            <Row gutter={12}>
-              <Col span={12}>
-                <Form.Item
-                  label="Expiry (MM/YY)"
-                  name="expiry"
-                  rules={[
-                    { required: true, message: "Expiry is required" },
-                    {
-                      validator: (_, value) => {
-                        if (!value) return Promise.reject();
-                        if (!validateExpiry(value))
-                          return Promise.reject("Invalid or expired date");
-                        return Promise.resolve();
+              <Row gutter={12}>
+                <Col span={12}>
+                  <Form.Item
+                    label="Expiry (MM/YY)"
+                    name="expiry"
+                    rules={[
+                      { required: true, message: "Expiry is required" },
+                      {
+                        validator: (_, value) => {
+                          if (!value) return Promise.reject();
+                          if (!validateExpiry(value))
+                            return Promise.reject("Invalid or expired date");
+                          return Promise.resolve();
+                        },
                       },
-                    },
-                  ]}
-                >
-                  <Input placeholder="MM/YY or MM/YYYY" inputMode="numeric" />
-                </Form.Item>
-              </Col>
+                    ]}
+                  >
+                    <Input placeholder="MM/YY or MM/YYYY" inputMode="numeric" />
+                  </Form.Item>
+                </Col>
 
-              <Col span={12}>
-                <Form.Item
-                  label="CVV"
-                  name="cvv"
-                  rules={[
-                    { required: true, message: "CVV is required" },
-                    {
-                      validator: (_, value) => {
-                        const num = (value || "").replace(/\D/g, "");
-                        const cardNumRaw = (
-                          form.getFieldValue("cardNumber") || ""
-                        ).replace(/\D/g, "");
-                        if (!num) return Promise.reject();
-                        if (isAmex(cardNumRaw)) {
-                          if (!/^\d{4}$/.test(num))
-                            return Promise.reject("AMEX CVV must be 4 digits");
-                        } else {
-                          if (!/^\d{3}$/.test(num))
-                            return Promise.reject("CVV must be 3 digits");
-                        }
-                        return Promise.resolve();
+                <Col span={12}>
+                  <Form.Item
+                    label="CVV"
+                    name="cvv"
+                    rules={[
+                      { required: true, message: "CVV is required" },
+                      {
+                        validator: (_, value) => {
+                          const num = (value || "").replace(/\D/g, "");
+                          const cardNumRaw = (
+                            form.getFieldValue("cardNumber") || ""
+                          ).replace(/\D/g, "");
+                          if (!num) return Promise.reject();
+                          if (isAmex(cardNumRaw)) {
+                            if (!/^\d{4}$/.test(num))
+                              return Promise.reject(
+                                "AMEX CVV must be 4 digits"
+                              );
+                          } else {
+                            if (!/^\d{3}$/.test(num))
+                              return Promise.reject("CVV must be 3 digits");
+                          }
+                          return Promise.resolve();
+                        },
                       },
-                    },
-                  ]}
-                >
-                  <Input placeholder="123" maxLength={4} inputMode="numeric" />
-                </Form.Item>
-              </Col>
-            </Row>
-            {/* 
+                    ]}
+                  >
+                    <Input
+                      placeholder="123"
+                      maxLength={4}
+                      inputMode="numeric"
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+              {/* 
             <Form.Item label="Card image (optional)">
               <Upload
                 beforeUpload={handleBeforeUpload}
@@ -390,15 +419,16 @@ export default function AddCardModal({
               )}
             </Form.Item> */}
 
-            <Form.Item>
-              <Space>
-                <Button onClick={onClose}>Cancel</Button>
-                <Button type="primary" htmlType="submit" loading={submitting}>
-                  Save card
-                </Button>
-              </Space>
-            </Form.Item>
-          </Form>
+              <Form.Item>
+                <Space>
+                  <Button onClick={onClose}>Cancel</Button>
+                  <Button type="primary" htmlType="submit" loading={submitting}>
+                    Save card
+                  </Button>
+                </Space>
+              </Form.Item>
+            </Form>
+          </div>
         </Col>
       </Row>
     </div>

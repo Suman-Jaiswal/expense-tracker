@@ -4,7 +4,6 @@ import { useState } from "react";
 import { featureFlag } from "../featureFlag";
 import AddCardModal from "./AddCardModal";
 import Dashboard from "./Dashboard";
-import OverviewTab from "./OverviewTab";
 import ResourceList from "./ResourceList";
 import Statements from "./Statements";
 import TransactionList from "./TransactionList";
@@ -53,28 +52,9 @@ export default function ContentPage({
           Please select a resource from the menu to view details.
         </div>
       ) : resourceIdentifier === "dashboard" ? (
-        <Tabs
-          tabPosition={"top"}
-          defaultActiveKey="1"
-          style={{ padding: "0 24px" }}
-          items={[
-            {
-              label: "📊 Dashboard",
-              key: "1",
-              children: <Dashboard resources={resources} />,
-            },
-            {
-              label: "Overview",
-              key: "2",
-              children: <OverviewTab resources={resources} />,
-            },
-            {
-              label: "Transactions",
-              key: "3",
-              children: <TransactionList />,
-            },
-          ]}
-        />
+        <Dashboard resources={resources} />
+      ) : resourceIdentifier === "transactions" ? (
+        <TransactionList />
       ) : resourceIdentifier === "statements" ? (
         <Statements />
       ) : resourceIdentifier === "add_card" ? (
@@ -151,6 +131,7 @@ export default function ContentPage({
                           ? resources.cards
                           : resources.cards.filter((c) => c.id === cardSelected)
                       }
+                      setResourceIdentifier={setResourceIdentifier}
                     />
                   ),
                 },
@@ -164,15 +145,12 @@ export default function ContentPage({
               ]}
             />
           ) : (
-            <ResourceList resource={resources.cards} />
+            <ResourceList
+              resource={resources.cards}
+              setResourceIdentifier={setResourceIdentifier}
+            />
           )}
         </>
-      ) : resourceIdentifier === "accounts" ? (
-        <ResourceList
-          resource={resources.accounts}
-          resourceType="accounts"
-          resourceTitle="Bank Accounts"
-        />
       ) : null}
     </div>
   );

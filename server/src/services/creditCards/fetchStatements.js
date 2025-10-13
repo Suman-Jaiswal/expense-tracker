@@ -50,11 +50,11 @@ function extractStatementDataFromBody(bodyData) {
 }
 
 function extractStatementPeriod(subject, resourceConfig) {
-  // Example subject: "Flipkart Axis Bank Credit Card Statement ending XX76 - September 2025"
-  const periodRe = /statement ending \w+ - ([A-Za-z]+ \d{4})/i;
-  const match = subject.match(periodRe);
-  if (match) {
-    const [month, year] = match[1].split(" ");
+  // Try AXIS format first: "Flipkart Axis Bank Credit Card Statement ending XX76 - September 2025"
+  const axisRe = /statement ending \w+ - ([A-Za-z]+ \d{4})/i;
+  const axisMatch = subject.match(axisRe);
+  if (axisMatch) {
+    const [month, year] = axisMatch[1].split(" ");
     const startISO = new Date(
       `${month} ${resourceConfig.statementGenerationDay}, ${year}`
     )
@@ -69,6 +69,20 @@ function extractStatementPeriod(subject, resourceConfig) {
       .split("T")[0];
     return { startISO, endISO };
   }
+
+  // Try ICICI format: "period August 16 2025 to September 15 2025" or "period August 13, 2025 to September 12, 2025"
+  const iciciRe =
+    /period\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4})\s+to\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i;
+  const iciciMatch = subject.match(iciciRe);
+  if (iciciMatch) {
+    const startDate = iciciMatch[1];
+    const endDate = iciciMatch[2];
+    const startISO = new Date(startDate).toISOString().split("T")[0];
+    const endISO = new Date(endDate).toISOString().split("T")[0];
+    return { startISO, endISO };
+  }
+
+  console.warn("⚠️  Could not extract period from subject:", subject);
   return { startISO: null, endISO: null };
 }
 

@@ -1,4 +1,5 @@
 import fs from "fs";
+import { JSDOM } from "jsdom";
 import {
   addStatement,
   checkStatementExists,
@@ -9,11 +10,25 @@ import { decryptPdfTmp } from "../../utils/pdfDecrypter.js";
 
 // --- Main Function to Fetch and Process Emails ---
 function extractStatementPeriod(text) {
-  const match = text.match(
-    /period\s+([A-Za-z]+\s+\d{1,2}[\s,\s]+\d{4})\s+to\s+([A-Za-z]+\s+\d{1,2}[\s,\s]+\d{4})/i
+  // Pattern 1: "period  August 16 2025 to September 15 2025" (with possible double spaces)
+  // Pattern 2: "period August 13, 2025 to September 12, 2025" (with commas)
+  let match = text.match(
+    /period\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4})\s+to\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i
   );
 
-  if (!match) return null;
+  if (!match) {
+    console.warn("⚠️  Could not extract period from subject:", text);
+    // Return current month as fallback
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return {
+      startDate: firstDay.toLocaleDateString(),
+      endDate: lastDay.toLocaleDateString(),
+      startISO: firstDay.toISOString().split("T")[0],
+      endISO: lastDay.toISOString().split("T")[0],
+    };
+  }
 
   const startDate = match[1];
   const endDate = match[2];
@@ -30,6 +45,45 @@ const extractCardNumberFromFilename = (filename) => {
   const cardNumber = filename.split("_")[0];
   return `XX${cardNumber.slice(-4)}`;
 };
+
+function extractStatementData(document) {
+  // Extract ICICI statement data from email HTML
+  // ICICI emails typically have billing summary in the HTML
+  try {
+    // Look for common ICICI patterns
+    const allText = document.body.textContent;
+    const result = {};
+
+    // Try to extract Total Amount Due
+    const amountDueMatch = allText.match(
+      /Total Amount Due[:\s]*(?:INR|Rs\.?)?[\s]*([0-9,]+\.?\d*)/i
+    );
+    if (amountDueMatch) {
+      result.amountDue = amountDueMatch[1].replace(/,/g, "");
+    }
+
+    // Try to extract Minimum Amount Due
+    const minAmountMatch = allText.match(
+      /Minimum Amount Due[:\s]*(?:INR|Rs\.?)?[\s]*([0-9,]+\.?\d*)/i
+    );
+    if (minAmountMatch) {
+      result.minimumAmountDue = minAmountMatch[1].replace(/,/g, "");
+    }
+
+    // Try to extract Payment Due Date
+    const dueDateMatch = allText.match(
+      /Payment Due Date[:\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{1,2}\s+[A-Za-z]+\s+\d{4})/i
+    );
+    if (dueDateMatch) {
+      result.paymentDueDate = dueDateMatch[1];
+    }
+
+    return Object.keys(result).length > 0 ? result : null;
+  } catch (error) {
+    console.warn("⚠️  Could not extract statement data:", error.message);
+    return null;
+  }
+}
 
 const fetchStatementsICICI = async (gmail, drive) => {
   const emailQuery = `from:(credit_cards@icicibank.com OR cards@icicibank.com) subject:("Statement") newer_than:${365}d`;
@@ -64,6 +118,16 @@ const fetchStatementsICICI = async (gmail, drive) => {
           continue;
         }
 
+        // Extract HTML body FIRST (same as AXIS)
+        const bodyData = email.data.payload.parts[0].body.data;
+        const rawHtml = Buffer.from(bodyData, "base64").toString("utf8");
+        const dom = new JSDOM(rawHtml);
+        const document = dom.window.document;
+
+        // Extract statement data from HTML
+        const statementData = extractStatementData(document);
+
+        // Extract period from subject
         const info = {
           cardNumber: extractCardNumberFromFilename(attachmentPart.filename),
           ...extractStatementPeriod(subject),
@@ -154,6 +218,7 @@ const fetchStatementsICICI = async (gmail, drive) => {
             start: info.startISO,
             end: info.endISO,
           },
+          statementData,
         });
 
         console.log(

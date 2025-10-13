@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import fs from "fs";
 import { config } from "../config.js";
 import {
@@ -31,14 +32,25 @@ export const validateStatementPDFAndUploadToDrive = async (
   statementId = null
 ) => {
   const driveRes = await checkStatementExistsInDrive(drive, fileName);
+  // TEMPORARY: Skip Drive check to force extraction (for testing)
+  // if (driveRes) {
+  //   console.log("Statement pdf already exists in Drive:", driveRes);
+  //   return { driveRes, transactions: [] }; // { id, webViewLink, webContentLink }
+  // } else {
   if (driveRes) {
-    console.log("Statement pdf already exists in Drive:", driveRes);
-    return { driveRes, transactions: [] }; // { id, webViewLink, webContentLink }
+    console.log(
+      "⚠️  Statement exists in Drive, but forcing extraction anyway (TEMP):",
+      fileName
+    );
   } else {
     console.log(
       "Statement pdf not found in Drive, proceeding to upload:",
       fileName
     );
+  }
+
+  // Always download and extract, even if already in Drive (TEMP for testing)
+  {
     const attachmentId = attachmentPart.body?.attachmentId;
 
     const attachment = await gmail.users.messages.attachments.get({
@@ -59,9 +71,14 @@ export const validateStatementPDFAndUploadToDrive = async (
       password
     );
 
-    // Upload to Drive
-    const res = await uploadPdfBytesToDrive(drive, decryptedPdfBytes, fileName);
-    console.log("✅ PDF uploaded to Drive:", fileName);
+    // Upload to Drive (only if not already there)
+    let res = driveRes;
+    if (!driveRes) {
+      res = await uploadPdfBytesToDrive(drive, decryptedPdfBytes, fileName);
+      console.log("✅ PDF uploaded to Drive:", fileName);
+    } else {
+      console.log("ℹ️  Using existing Drive file");
+    }
 
     // Extract transactions from the PDF
     let extractedTransactions = [];
@@ -76,21 +93,31 @@ export const validateStatementPDFAndUploadToDrive = async (
         `✅ Extracted ${extractionResult.totalTransactions} transactions from ${extractionResult.bank} statement`
       );
 
-      // Format transactions for database
+      // Format transactions for database with deterministic IDs
       if (resourceIdentifier && extractionResult.transactions.length > 0) {
-        extractedTransactions = extractionResult.transactions.map((txn) => ({
-          id: txn.id,
-          resourceIdentifier: resourceIdentifier,
-          statementId: statementId || message.id,
-          date: txn.date,
-          description: txn.description,
-          merchant: txn.merchant,
-          amount: txn.amount,
-          type: txn.type,
-          category: txn.category,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }));
+        extractedTransactions = extractionResult.transactions.map((txn) => {
+          // Generate deterministic ID based on actual resourceIdentifier
+          const idData = `${resourceIdentifier}|${txn.date}|${txn.description}|${txn.amount}|${txn.type}`;
+          const deterministicId = `txn_${crypto
+            .createHash("md5")
+            .update(idData)
+            .digest("hex")
+            .substring(0, 16)}`;
+
+          return {
+            id: deterministicId,
+            resourceIdentifier: resourceIdentifier,
+            statementId: statementId || message.id,
+            date: txn.date,
+            description: txn.description,
+            merchant: txn.merchant,
+            amount: txn.amount,
+            type: txn.type,
+            category: txn.category,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+        });
 
         console.log(
           `💾 Formatted ${extractedTransactions.length} transactions for database`
