@@ -43,7 +43,6 @@ import {
   getMonthlyTrends,
   getRecentTransactions,
 } from "../utils/dataAggregation";
-import TransactionReviewModal from "./TransactionReviewModal";
 
 const COLORS = [
   "#ff6b6b",
@@ -64,8 +63,6 @@ const Dashboard = ({ resources }) => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [syncing, setSyncing] = useState(false);
-  const [reviewModalVisible, setReviewModalVisible] = useState(false);
-  const [ambiguousTransactions, setAmbiguousTransactions] = useState([]);
 
   useEffect(() => {
     fetchTransactions();
@@ -91,15 +88,8 @@ const Dashboard = ({ resources }) => {
       const result = await syncTransactions();
       if (result.success) {
         toast.success(result.message);
-
-        // If there are ambiguous transactions, show review modal
-        if (result.needsReview && result.ambiguousTransactions?.length > 0) {
-          setAmbiguousTransactions(result.ambiguousTransactions);
-          setReviewModalVisible(true);
-        } else {
-          // Refresh transactions list
-          await fetchTransactions();
-        }
+        // Refresh transactions list
+        await fetchTransactions();
       } else {
         toast.error(result.message || "Failed to sync transactions");
       }
@@ -378,17 +368,6 @@ const Dashboard = ({ resources }) => {
           </Card>
         </Col>
       </Row>
-
-      {/* Transaction Review Modal */}
-      <TransactionReviewModal
-        visible={reviewModalVisible}
-        ambiguousTransactions={ambiguousTransactions}
-        onClose={() => setReviewModalVisible(false)}
-        onComplete={() => {
-          // Refresh transactions after all reviews are complete
-          fetchTransactions();
-        }}
-      />
     </div>
   );
 };

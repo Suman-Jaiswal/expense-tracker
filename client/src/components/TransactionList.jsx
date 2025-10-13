@@ -1,6 +1,6 @@
-import { EditOutlined, SyncOutlined, WarningOutlined } from "@ant-design/icons";
+import { DeleteOutlined, EditOutlined, SyncOutlined } from "@ant-design/icons";
 import {
-  Alert,
+  App,
   Button,
   Empty,
   Form,
@@ -8,7 +8,6 @@ import {
   InputNumber,
   Modal,
   Select,
-  Space,
   Spin,
   Statistic,
   Table,
@@ -18,15 +17,12 @@ import {
   theme,
 } from "antd";
 import { format } from "date-fns";
+import { deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
-import {
-  getAllTransactions,
-  getAmbiguousTransactions,
-  syncTransactions,
-  updateTransaction,
-} from "../api";
+import { getAllStatements, getAllTransactions, syncTransactions } from "../api";
 import { useApp } from "../context/AppContext";
+import { db } from "../firebase";
 import {
   formatCategoryTag,
   getCategoryColor,
@@ -34,7 +30,6 @@ import {
 } from "../utils/categoryIcons";
 import { formatCurrency } from "../utils/dataAggregation";
 import TransactionFilters from "./TransactionFilters";
-import TransactionReviewModal from "./TransactionReviewModal";
 
 const { Title, Text } = Typography;
 
@@ -44,33 +39,29 @@ export default function TransactionList({ resourceIdentifier }) {
   } = theme.useToken();
   const { state } = useApp();
   const { resources } = state;
+  const { modal } = App.useApp();
   const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
+  const [statements, setStatements] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({});
   const [syncing, setSyncing] = useState(false);
-  const [reviewModalVisible, setReviewModalVisible] = useState(false);
-  const [ambiguousTransactions, setAmbiguousTransactions] = useState([]);
-  const [ambiguousCount, setAmbiguousCount] = useState(0);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [editForm] = Form.useForm();
 
   useEffect(() => {
     fetchTransactions();
-    checkAmbiguousTransactions();
+    fetchStatements();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resourceIdentifier]); // Re-fetch when resourceIdentifier changes
 
-  const checkAmbiguousTransactions = async () => {
+  const fetchStatements = async () => {
     try {
-      const result = await getAmbiguousTransactions();
-      if (result.success) {
-        setAmbiguousCount(result.count);
-        setAmbiguousTransactions(result.transactions);
-      }
+      const data = await getAllStatements();
+      setStatements(data || []);
     } catch (error) {
-      console.error("Failed to fetch ambiguous transactions:", error);
+      console.error("Error fetching statements:", error);
     }
   };
 
@@ -105,29 +96,8 @@ export default function TransactionList({ resourceIdentifier }) {
       if (result.success) {
         toast.success(result.message);
 
-        // Refresh transactions list first
+        // Refresh transactions list
         await fetchTransactions();
-
-        // Check for ambiguous transactions
-        await checkAmbiguousTransactions();
-
-        // If there are ambiguous transactions from THIS sync, show review modal
-        if (result.needsReview && result.ambiguousTransactions?.length > 0) {
-          console.log(
-            "⚠️ Found ambiguous transactions:",
-            result.ambiguousTransactions
-          ); // Debug log
-          setAmbiguousTransactions(result.ambiguousTransactions);
-          setReviewModalVisible(true);
-        } else if (ambiguousCount > 0) {
-          // Show notification that there are existing ambiguous transactions
-          toast(
-            `Sync complete! You have ${ambiguousCount} transaction${
-              ambiguousCount > 1 ? "s" : ""
-            } that need review.`,
-            { icon: "⚠️", duration: 5000 }
-          );
-        }
       } else {
         toast.error(result.message || "Failed to sync transactions");
       }
@@ -141,6 +111,7 @@ export default function TransactionList({ resourceIdentifier }) {
 
   // Handle edit transaction
   const handleEditTransaction = (transaction) => {
+    console.log("Opening edit modal for transaction:", transaction);
     setEditingTransaction(transaction);
     editForm.setFieldsValue({
       amount: transaction.amount,
@@ -154,19 +125,125 @@ export default function TransactionList({ resourceIdentifier }) {
   const handleSaveEdit = async () => {
     try {
       const values = await editForm.validateFields();
-      await updateTransaction(editingTransaction.id, {
+
+      // Update transaction directly in Firebase
+      const txnRef = doc(db, "transactions", editingTransaction.id);
+      await updateDoc(txnRef, {
         ...values,
         amount: parseFloat(values.amount),
-        isAmbiguous: false,
-        needsReview: false,
+        updatedAt: new Date().toISOString(),
       });
+
       toast.success("Transaction updated successfully");
       setEditModalVisible(false);
       fetchTransactions();
-      checkAmbiguousTransactions(); // Refresh ambiguous count
     } catch (error) {
+      console.error("Error updating transaction:", error);
       toast.error("Failed to update transaction");
     }
+  };
+
+  const handleDeleteTransaction = () => {
+    if (!editingTransaction) {
+      console.error("No transaction selected for deletion");
+      return;
+    }
+
+    console.log("Attempting to delete transaction:", editingTransaction.id);
+
+    // Store transaction details before closing modal
+    const transactionToDelete = { ...editingTransaction };
+
+    // Close edit modal first to avoid z-index conflicts
+    setEditModalVisible(false);
+
+    // Small delay to ensure edit modal is closed
+    setTimeout(() => {
+      console.log("Showing confirmation dialog");
+
+      modal.confirm({
+        title: "Delete Transaction",
+        icon: <DeleteOutlined style={{ color: "#ff4d4f" }} />,
+        content: (
+          <div style={{ color: "rgba(0, 0, 0, 0.88)" }}>
+            <p style={{ marginBottom: 16 }}>
+              Are you sure you want to delete this transaction? This action
+              cannot be undone.
+            </p>
+            <div
+              style={{
+                padding: 12,
+                background: "rgba(0, 0, 0, 0.04)",
+                borderRadius: 6,
+                border: "1px solid rgba(0, 0, 0, 0.06)",
+              }}
+            >
+              <div style={{ marginBottom: 8, color: "rgba(0, 0, 0, 0.88)" }}>
+                <strong style={{ color: "rgba(0, 0, 0, 0.88)" }}>Date:</strong>{" "}
+                {transactionToDelete.date}
+              </div>
+              <div style={{ marginBottom: 8, color: "rgba(0, 0, 0, 0.88)" }}>
+                <strong style={{ color: "rgba(0, 0, 0, 0.88)" }}>
+                  Description:
+                </strong>{" "}
+                {transactionToDelete.description}
+              </div>
+              <div style={{ marginBottom: 8, color: "rgba(0, 0, 0, 0.88)" }}>
+                <strong style={{ color: "rgba(0, 0, 0, 0.88)" }}>
+                  Amount:
+                </strong>{" "}
+                ₹{transactionToDelete.amount}
+              </div>
+              <div style={{ color: "rgba(0, 0, 0, 0.88)" }}>
+                <strong style={{ color: "rgba(0, 0, 0, 0.88)" }}>Type:</strong>{" "}
+                <Tag
+                  color={
+                    transactionToDelete.type === "credit" ? "green" : "red"
+                  }
+                >
+                  {transactionToDelete.type?.toUpperCase()}
+                </Tag>
+              </div>
+            </div>
+          </div>
+        ),
+        okText: "Delete",
+        okType: "danger",
+        cancelText: "Cancel",
+        centered: true,
+        onOk: async () => {
+          try {
+            console.log(
+              "Delete confirmed for transaction:",
+              transactionToDelete.id
+            );
+            const txnRef = doc(db, "transactions", transactionToDelete.id);
+            console.log("Transaction reference created");
+
+            await deleteDoc(txnRef);
+            console.log("Transaction deleted successfully from Firebase");
+
+            toast.success("Transaction deleted successfully");
+
+            // Refresh data
+            await fetchTransactions();
+          } catch (error) {
+            console.error("Error deleting transaction:", error);
+            console.error("Error details:", {
+              message: error.message,
+              code: error.code,
+              stack: error.stack,
+            });
+            toast.error(`Failed to delete transaction: ${error.message}`);
+          }
+        },
+        onCancel: () => {
+          console.log("Delete cancelled");
+        },
+      });
+
+      console.log("Confirmation dialog triggered");
+    }, 100);
   };
 
   // Apply filters
@@ -189,6 +266,13 @@ export default function TransactionList({ resourceIdentifier }) {
     if (newFilters.selectedCard) {
       filtered = filtered.filter(
         (tx) => tx.resourceIdentifier === newFilters.selectedCard
+      );
+    }
+
+    // Statement filter
+    if (newFilters.selectedStatement) {
+      filtered = filtered.filter(
+        (tx) => tx.statementId === newFilters.selectedStatement
       );
     }
 
@@ -303,27 +387,16 @@ export default function TransactionList({ resourceIdentifier }) {
       align: "right",
       sorter: (a, b) => parseFloat(a.amount) - parseFloat(b.amount),
       render: (amount, record) => (
-        <Space>
-          {record.isAmbiguous && (
-            <Tooltip
-              title={`Needs verification: ${
-                record.ambiguousReason || "unknown"
-              }`}
-            >
-              <WarningOutlined style={{ color: "#faad14", fontSize: 16 }} />
-            </Tooltip>
-          )}
-          <Text
-            style={{
-              color: record.type === "credit" ? "#52c41a" : "#ff4d4f",
-              fontWeight: record.isAmbiguous ? 700 : 600,
-              fontFamily: "monospace",
-            }}
-          >
-            {record.type === "credit" ? "+" : "-"}
-            {formatCurrency(amount)}
-          </Text>
-        </Space>
+        <Text
+          style={{
+            color: record.type === "credit" ? "#52c41a" : "#ff4d4f",
+            fontWeight: 600,
+            fontFamily: "monospace",
+          }}
+        >
+          {record.type === "credit" ? "+" : "-"}
+          {formatCurrency(amount)}
+        </Text>
       ),
     },
     {
@@ -387,21 +460,14 @@ export default function TransactionList({ resourceIdentifier }) {
       width: 100,
       fixed: "right",
       render: (_, record) => (
-        <Space>
-          <Tooltip title="Edit transaction">
-            <Button
-              type="link"
-              icon={<EditOutlined />}
-              onClick={() => handleEditTransaction(record)}
-              size="small"
-            />
-          </Tooltip>
-          {record.isAmbiguous && (
-            <Tooltip title="Needs review">
-              <WarningOutlined style={{ color: "#faad14" }} />
-            </Tooltip>
-          )}
-        </Space>
+        <Tooltip title="Edit transaction">
+          <Button
+            type="link"
+            icon={<EditOutlined />}
+            onClick={() => handleEditTransaction(record)}
+            size="small"
+          />
+        </Tooltip>
       ),
     },
   ];
@@ -467,46 +533,11 @@ export default function TransactionList({ resourceIdentifier }) {
         </div>
       )}
 
-      {/* Ambiguous Transactions Alert */}
-      {ambiguousCount > 0 && (
-        <Alert
-          message={
-            <Space>
-              <WarningOutlined />
-              <strong>
-                {ambiguousCount} Transaction{ambiguousCount > 1 ? "s" : ""} Need
-                {ambiguousCount === 1 ? "s" : ""} Review
-              </strong>
-            </Space>
-          }
-          description={
-            <Space direction="vertical" style={{ width: "100%" }}>
-              <span>
-                Some transactions have ambiguous amounts or formatting that need
-                manual verification.
-              </span>
-              <Button
-                type="primary"
-                size="small"
-                icon={<WarningOutlined />}
-                onClick={() => setReviewModalVisible(true)}
-              >
-                Review Now ({ambiguousCount})
-              </Button>
-            </Space>
-          }
-          type="warning"
-          showIcon
-          closable
-          onClose={() => setAmbiguousCount(0)}
-          style={{ marginBottom: 16 }}
-        />
-      )}
-
       {/* Filters */}
       <TransactionFilters
         onFilterChange={handleFilterChange}
         cards={resources?.cards || []}
+        statements={statements}
         transactions={filteredTransactions}
         hideCardFilter={!!resourceIdentifier} // Hide card filter when viewing specific card
       />
@@ -580,26 +611,29 @@ export default function TransactionList({ resourceIdentifier }) {
         />
       )}
 
-      {/* Transaction Review Modal */}
-      <TransactionReviewModal
-        visible={reviewModalVisible}
-        ambiguousTransactions={ambiguousTransactions}
-        onClose={() => setReviewModalVisible(false)}
-        onComplete={() => {
-          // Refresh transactions and ambiguous count after all reviews are complete
-          fetchTransactions();
-          checkAmbiguousTransactions();
-        }}
-      />
-
       {/* Edit Transaction Modal */}
       <Modal
         title="Edit Transaction"
         open={editModalVisible}
         onCancel={() => setEditModalVisible(false)}
-        onOk={handleSaveEdit}
-        okText="Save"
         width={500}
+        footer={[
+          <Button
+            key="delete"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={handleDeleteTransaction}
+            style={{ float: "left" }}
+          >
+            Delete
+          </Button>,
+          <Button key="cancel" onClick={() => setEditModalVisible(false)}>
+            Cancel
+          </Button>,
+          <Button key="save" type="primary" onClick={handleSaveEdit}>
+            Save
+          </Button>,
+        ]}
       >
         <Form form={editForm} layout="vertical">
           <Form.Item

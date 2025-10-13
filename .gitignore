@@ -59,6 +59,10 @@ Thumbs.db
 /tmp
 /temp
 
+# Backups (sensitive financial data)
+/server/backups/
+backups/
+
 # PDF files (may contain sensitive data)
 *.pdf
 

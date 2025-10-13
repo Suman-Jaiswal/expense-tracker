@@ -166,9 +166,3 @@ export const updateTransaction = async (id, updates) => {
   });
   return response.json();
 };
-
-// Get all ambiguous transactions
-export const getAmbiguousTransactions = async () => {
-  const response = await fetch(`${API_BASE_URL}/transactions/ambiguous`);
-  return response.json();
-};

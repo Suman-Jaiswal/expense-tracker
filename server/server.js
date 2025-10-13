@@ -354,37 +354,6 @@ export function startServer() {
         res.json({ success: true, message: "Test route works!" });
       });
 
-      console.log("✅ Registering /transactions/ambiguous route...");
-      // Get ambiguous transactions
-      app.get(
-        "/transactions/ambiguous",
-        asyncHandler(async (req, res) => {
-          const { collection, getDocs, query, where } = await import(
-            "firebase/firestore"
-          );
-          const { db } = await import("./firebase.js");
-
-          const transactionsRef = collection(db, "transactions");
-          const q = query(transactionsRef, where("isAmbiguous", "==", true));
-          const snapshot = await getDocs(q);
-
-          const ambiguousTransactions = [];
-          snapshot.forEach((doc) => {
-            ambiguousTransactions.push({
-              id: doc.id,
-              ...doc.data(),
-            });
-          });
-
-          res.json({
-            success: true,
-            count: ambiguousTransactions.length,
-            transactions: ambiguousTransactions,
-            timestamp: new Date().toISOString(),
-          });
-        })
-      );
-
       // Check for new statements
       app.get(
         "/statements/check-new",

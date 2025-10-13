@@ -27,6 +27,7 @@ const { RangePicker } = DatePicker;
 const TransactionFilters = ({
   onFilterChange,
   cards,
+  statements,
   transactions,
   hideCardFilter = false,
 }) => {
@@ -36,6 +37,7 @@ const TransactionFilters = ({
   const [minAmount, setMinAmount] = useState(null);
   const [maxAmount, setMaxAmount] = useState(null);
   const [transactionType, setTransactionType] = useState(null);
+  const [selectedStatement, setSelectedStatement] = useState(null);
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Apply filters
@@ -47,6 +49,7 @@ const TransactionFilters = ({
       minAmount,
       maxAmount,
       transactionType,
+      selectedStatement,
     };
     onFilterChange(filters);
   };
@@ -59,6 +62,7 @@ const TransactionFilters = ({
     setMinAmount(null);
     setMaxAmount(null);
     setTransactionType(null);
+    setSelectedStatement(null);
     onFilterChange({});
   };
 
@@ -102,6 +106,7 @@ const TransactionFilters = ({
       minAmount,
       maxAmount,
       transactionType,
+      selectedStatement,
     });
 
     toast.success(`Filter applied: ${type}`);
@@ -153,6 +158,52 @@ const TransactionFilters = ({
     { key: "lastMonth", label: "Last Month" },
   ];
 
+  // Format statement label
+  const formatStatementLabel = (statement) => {
+    if (!statement) return "";
+
+    const cardName =
+      statement.resourceIdentifier?.replace("card_", "") || "Unknown Card";
+
+    if (statement.period?.start && statement.period?.end) {
+      try {
+        const startDate = new Date(statement.period.start);
+        const endDate = new Date(statement.period.end);
+        const startMonth = startDate.toLocaleString("en-US", {
+          month: "short",
+        });
+        const endMonth = endDate.toLocaleString("en-US", { month: "short" });
+        const year = endDate.getFullYear();
+
+        if (startMonth === endMonth) {
+          return `${cardName} - ${startMonth} ${year}`;
+        } else {
+          return `${cardName} - ${startMonth} - ${endMonth} ${year}`;
+        }
+      } catch (error) {
+        return `${cardName} - ${statement.id}`;
+      }
+    }
+
+    return `${cardName} - ${statement.id}`;
+  };
+
+  // Get statement options
+  const statementOptions =
+    statements
+      ?.filter((stmt) => stmt.id)
+      .map((stmt) => ({
+        label: formatStatementLabel(stmt),
+        value: stmt.id,
+        searchText: `${stmt.resourceIdentifier} ${
+          stmt.id
+        } ${formatStatementLabel(stmt)}`,
+      }))
+      .sort((a, b) => {
+        // Sort by label (which includes card name and period)
+        return b.label.localeCompare(a.label);
+      }) || [];
+
   const activeFiltersCount = [
     searchText,
     selectedCard,
@@ -160,6 +211,7 @@ const TransactionFilters = ({
     minAmount,
     maxAmount,
     transactionType,
+    selectedStatement,
   ].filter(Boolean).length;
 
   return (
@@ -253,6 +305,27 @@ const TransactionFilters = ({
                   { label: "All Types", value: null },
                   { label: "Debit", value: "debit" },
                   { label: "Credit", value: "credit" },
+                ]}
+              />
+            </Col>
+
+            {/* Statement Filter */}
+            <Col xs={24} sm={12} md={8}>
+              <Select
+                placeholder="Select Statement Period"
+                style={{ width: "100%" }}
+                value={selectedStatement}
+                onChange={setSelectedStatement}
+                allowClear
+                showSearch
+                filterOption={(input, option) =>
+                  (option?.searchText ?? "")
+                    .toLowerCase()
+                    .includes(input.toLowerCase())
+                }
+                options={[
+                  { label: "All Statements", value: null, searchText: "all" },
+                  ...statementOptions,
                 ]}
               />
             </Col>
