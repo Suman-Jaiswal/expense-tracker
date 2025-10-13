@@ -4,7 +4,9 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
   setDoc,
+  where,
 } from "firebase/firestore";
 import { db } from "../../firebase.js";
 
@@ -54,4 +56,32 @@ export const deleteAllTransactions = async () => {
     console.log("Transaction deleted with id:", transaction.id);
   }
   console.log("All transactions deleted");
+};
+
+/**
+ * Check if transactions already exist for a given statement
+ * @param {string} statementId - The statement ID to check
+ * @returns {Promise<boolean>} - True if transactions exist, false otherwise
+ */
+export const hasTransactionsForStatement = async (statementId) => {
+  const q = query(
+    transactionsCollection,
+    where("statementId", "==", statementId)
+  );
+  const snapshot = await getDocs(q);
+  return !snapshot.empty;
+};
+
+/**
+ * Get transaction count for a given statement
+ * @param {string} statementId - The statement ID
+ * @returns {Promise<number>} - Number of transactions for this statement
+ */
+export const getTransactionCountForStatement = async (statementId) => {
+  const q = query(
+    transactionsCollection,
+    where("statementId", "==", statementId)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.size;
 };

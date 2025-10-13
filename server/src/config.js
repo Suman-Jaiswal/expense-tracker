@@ -15,13 +15,13 @@ export const config = {
   XX5000: "XX5000",
   RESOURCES: {
     SBI: {
-      enabled: false,
+      enabled: true,
       label: "SBI Card",
       identifierPrefix: "card_SBI_",
       pdfPassword: process.env.SBI_PDF_PASSWORD || "",
-      cards: ["XX5965"],
+      cards: ["XX5965"], // Your actual SBI card number (last 4 digits)
       statementGenerationDay: 25,
-      emailQuery: `from:(Statements@sbicard.com) subject:("SBI Card Monthly Statement") newer_than:${365}d`,
+      emailQuery: `from:(Statements@sbicard.com) subject:("SimplySAVE - SBI Card Monthly Statement" OR "SBI Card Monthly Statement") newer_than:${365}d`,
     },
     AXIS: {
       enabled: true,

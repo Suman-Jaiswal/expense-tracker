@@ -2,11 +2,23 @@ import {
   ArrowDownOutlined,
   ArrowUpOutlined,
   CreditCardOutlined,
+  SyncOutlined,
   TransactionOutlined,
 } from "@ant-design/icons";
-import { Card, Col, Row, Statistic, Table, Tag, theme, Typography } from "antd";
+import {
+  Button,
+  Card,
+  Col,
+  Row,
+  Statistic,
+  Table,
+  Tag,
+  theme,
+  Typography,
+} from "antd";
 import { format } from "date-fns";
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import {
   Bar,
   BarChart,
@@ -22,7 +34,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { getAllTransactions } from "../api";
+import { getAllTransactions, syncTransactions } from "../api";
 import {
   formatCurrency,
   getCardWiseSpending,
@@ -31,6 +43,7 @@ import {
   getMonthlyTrends,
   getRecentTransactions,
 } from "../utils/dataAggregation";
+import TransactionReviewModal from "./TransactionReviewModal";
 
 const COLORS = [
   "#ff6b6b",
@@ -50,6 +63,9 @@ const Dashboard = ({ resources }) => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [ambiguousTransactions, setAmbiguousTransactions] = useState([]);
 
   useEffect(() => {
     fetchTransactions();
@@ -66,6 +82,32 @@ const Dashboard = ({ resources }) => {
       console.error("Error fetching transactions:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSyncTransactions = async () => {
+    setSyncing(true);
+    try {
+      const result = await syncTransactions();
+      if (result.success) {
+        toast.success(result.message);
+
+        // If there are ambiguous transactions, show review modal
+        if (result.needsReview && result.ambiguousTransactions?.length > 0) {
+          setAmbiguousTransactions(result.ambiguousTransactions);
+          setReviewModalVisible(true);
+        } else {
+          // Refresh transactions list
+          await fetchTransactions();
+        }
+      } else {
+        toast.error(result.message || "Failed to sync transactions");
+      }
+    } catch (error) {
+      toast.error("Failed to sync transactions");
+      console.error(error);
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -136,13 +178,31 @@ const Dashboard = ({ resources }) => {
       }}
     >
       {/* Header Section */}
-      <div style={{ marginBottom: 24 }}>
-        <Typography.Title level={2} style={{ margin: 0 }}>
-          📊 Dashboard
-        </Typography.Title>
-        <Typography.Text type="secondary">
-          Overview of your expenses and spending patterns
-        </Typography.Text>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 24,
+        }}
+      >
+        <div>
+          <Typography.Title level={2} style={{ margin: 0 }}>
+            📊 Dashboard
+          </Typography.Title>
+          <Typography.Text type="secondary">
+            Overview of your expenses and spending patterns
+          </Typography.Text>
+        </div>
+        <Button
+          type="primary"
+          icon={<SyncOutlined spin={syncing} />}
+          onClick={handleSyncTransactions}
+          loading={syncing}
+          size="large"
+        >
+          Sync Transactions
+        </Button>
       </div>
 
       {/* Summary Cards */}
@@ -318,6 +378,17 @@ const Dashboard = ({ resources }) => {
           </Card>
         </Col>
       </Row>
+
+      {/* Transaction Review Modal */}
+      <TransactionReviewModal
+        visible={reviewModalVisible}
+        ambiguousTransactions={ambiguousTransactions}
+        onClose={() => setReviewModalVisible(false)}
+        onComplete={() => {
+          // Refresh transactions after all reviews are complete
+          fetchTransactions();
+        }}
+      />
     </div>
   );
 };

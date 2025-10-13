@@ -7,7 +7,7 @@ export const getAllTransactions = async () => {
   const transactions = getDocs(transactionsCollection);
   const snapshot = await transactions;
   const transactionsList = snapshot.docs.map((doc) => doc.data());
-  console.log("Fetched transactions:", transactionsList);
+  console.log("Fetched transactions:", transactionsList.length);
 
   return transactionsList;
 };
@@ -124,4 +124,51 @@ export const updateBankAccount = async (accountId, updates) => {
   };
   await setDoc(accountRef, updateData, { merge: true });
   return { success: true };
+};
+
+// Backend sync API endpoints
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:4000";
+
+// Sync statements
+export const syncStatements = async () => {
+  const response = await fetch(`${API_BASE_URL}/sync-statements`);
+  return response.json();
+};
+
+// Sync transactions
+export const syncTransactions = async () => {
+  const response = await fetch(`${API_BASE_URL}/sync-transactions`);
+  return response.json();
+};
+
+// Check for new statements
+export const checkNewStatements = async () => {
+  const response = await fetch(`${API_BASE_URL}/statements/check-new`);
+  return response.json();
+};
+
+// Add manual transaction
+export const addManualTransaction = async (transaction) => {
+  const response = await fetch(`${API_BASE_URL}/transactions/manual`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(transaction),
+  });
+  return response.json();
+};
+
+// Update existing transaction
+export const updateTransaction = async (id, updates) => {
+  const response = await fetch(`${API_BASE_URL}/transactions/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(updates),
+  });
+  return response.json();
+};
+
+// Get all ambiguous transactions
+export const getAmbiguousTransactions = async () => {
+  const response = await fetch(`${API_BASE_URL}/transactions/ambiguous`);
+  return response.json();
 };

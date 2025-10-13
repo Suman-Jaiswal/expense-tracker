@@ -23,6 +23,7 @@
     "multer": "^2.0.2",
     "node-qpdf": "^1.0.3",
     "open": "^10.2.0",
+    "openai": "^6.3.0",
     "patch-package": "^8.0.0",
     "pdf-parse": "^1.1.1",
     "server-destroy": "^1.0.1"

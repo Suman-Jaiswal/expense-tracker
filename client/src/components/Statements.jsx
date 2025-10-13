@@ -1,10 +1,11 @@
 import {
   CalendarOutlined,
+  CreditCardOutlined,
   EyeOutlined,
-  FilePdfFilled,
   FilePdfTwoTone,
   FolderOpenOutlined,
   SearchOutlined,
+  SyncOutlined,
 } from "@ant-design/icons";
 import {
   Badge,
@@ -26,8 +27,10 @@ import {
 import Meta from "antd/es/card/Meta";
 import { format } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
-import { getAllStatements } from "../api";
+import toast from "react-hot-toast";
+import { checkNewStatements, getAllStatements, syncStatements } from "../api";
 import { PdfViewer } from "./PdfViewer";
+import StatementSyncResultModal from "./StatementSyncResultModal";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -43,28 +46,91 @@ export default function Statements({ view = "tab", cardSelected }) {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("date-desc");
+  const [selectedCardFilter, setSelectedCardFilter] = useState("all");
+  const [syncing, setSyncing] = useState(false);
+  const [hasNewStatements, setHasNewStatements] = useState(false);
+  const [syncResultModalVisible, setSyncResultModalVisible] = useState(false);
+  const [syncResults, setSyncResults] = useState(null);
+
+  const fetchStatements = async () => {
+    setLoading(true);
+    try {
+      const data = await getAllStatements();
+      setStatements(data || []);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load statements");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setLoading(true);
-    getAllStatements()
-      .then((data) => {
-        setStatements(data || []);
-        setLoading(false);
-      })
-      .catch((error) => {
-        console.error(error);
-        setLoading(false);
-      });
+    fetchStatements();
   }, []);
+
+  // Check for new statements on mount
+  useEffect(() => {
+    checkNewStatements()
+      .then((res) => {
+        if (res.success) {
+          setHasNewStatements(res.hasNewStatements);
+        }
+      })
+      .catch(console.error);
+  }, []);
+
+  const handleSyncStatements = async () => {
+    setSyncing(true);
+    try {
+      const result = await syncStatements();
+      if (result.success) {
+        // Show result modal with newly added statements
+        setSyncResults(result);
+        setSyncResultModalVisible(true);
+        setHasNewStatements(false);
+
+        // Refresh statements list
+        await fetchStatements();
+
+        // Show quick toast notification
+        if (result.stats?.total > 0) {
+          toast.success(`${result.stats.total} new statement(s) added!`);
+        } else {
+          toast.success("No new statements found");
+        }
+      } else {
+        toast.error(result.message || "Failed to sync statements");
+      }
+    } catch (error) {
+      toast.error("Failed to sync statements");
+      console.error(error);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Get unique cards for filter
+  const uniqueCards = useMemo(() => {
+    const cards = [...new Set(statements.map((s) => s.resourceIdentifier))];
+    return cards.sort();
+  }, [statements]);
 
   // Filter and sort statements
   useEffect(() => {
     let filtered = statements;
 
-    // Filter by selected card
+    // Filter by selected card from props (for card-specific view)
     if (cardSelected) {
       filtered = filtered.filter((statement) =>
         statement.resourceIdentifier.includes(cardSelected)
+      );
+    }
+
+    // Filter by card filter dropdown
+    if (selectedCardFilter !== "all") {
+      filtered = filtered.filter(
+        (statement) => statement.resourceIdentifier === selectedCardFilter
       );
     }
 
@@ -96,7 +162,7 @@ export default function Statements({ view = "tab", cardSelected }) {
     });
 
     setFilterStatements(sorted);
-  }, [cardSelected, statements, searchTerm, sortBy]);
+  }, [cardSelected, statements, searchTerm, sortBy, selectedCardFilter]);
 
   // Calculate statistics
   const stats = useMemo(() => {
@@ -136,6 +202,20 @@ export default function Statements({ view = "tab", cardSelected }) {
     }
   };
 
+  const formatCardName = (resourceIdentifier) => {
+    // Parse format like "card_ICICI_XX9003" to "ICICI Card (XX9003)"
+    if (!resourceIdentifier) return "Unknown Card";
+
+    const parts = resourceIdentifier.split("_");
+    if (parts.length >= 3) {
+      const bank = parts[1]; // e.g., "ICICI", "AXIS", "SBI"
+      const cardNumber = parts.slice(2).join(" "); // e.g., "XX9003"
+      return `${bank} Card (${cardNumber})`;
+    }
+
+    return resourceIdentifier;
+  };
+
   if (loading) {
     return (
       <div
@@ -160,13 +240,33 @@ export default function Statements({ view = "tab", cardSelected }) {
       }}
     >
       {/* Header Section */}
-      <div style={{ marginBottom: 24 }}>
-        <Title level={2} style={{ margin: 0 }}>
-          📄 Statements
-        </Title>
-        <Text type="secondary">
-          View and manage all your credit card statements
-        </Text>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 24,
+        }}
+      >
+        <div>
+          <Title level={2} style={{ margin: 0 }}>
+            📄 Statements
+          </Title>
+          <Text type="secondary">
+            View and manage all your credit card statements
+          </Text>
+        </div>
+        <Badge dot={hasNewStatements} offset={[-5, 5]}>
+          <Button
+            type="primary"
+            icon={<SyncOutlined spin={syncing} />}
+            onClick={handleSyncStatements}
+            loading={syncing}
+            size="large"
+          >
+            Sync Statements
+          </Button>
+        </Badge>
       </div>
 
       {/* Statistics Cards */}
@@ -207,7 +307,7 @@ export default function Statements({ view = "tab", cardSelected }) {
         bodyStyle={{ padding: "16px" }}
       >
         <Row gutter={[16, 16]} align="middle">
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
             <Input
               size="large"
               placeholder="Search by card name or period..."
@@ -218,7 +318,24 @@ export default function Statements({ view = "tab", cardSelected }) {
               style={{ borderRadius: 8 }}
             />
           </Col>
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
+            <Select
+              size="large"
+              style={{ width: "100%", borderRadius: 8 }}
+              value={selectedCardFilter}
+              onChange={setSelectedCardFilter}
+              placeholder="Filter by card"
+              suffixIcon={<CreditCardOutlined />}
+            >
+              <Option value="all">💳 All Cards</Option>
+              {uniqueCards.map((card) => (
+                <Option key={card} value={card}>
+                  {formatCardName(card)}
+                </Option>
+              ))}
+            </Select>
+          </Col>
+          <Col xs={24} md={8}>
             <Select
               size="large"
               style={{ width: "100%", borderRadius: 8 }}
@@ -261,18 +378,47 @@ export default function Statements({ view = "tab", cardSelected }) {
               const id = String(i);
               return {
                 label: (
-                  <div style={{ textAlign: "left", padding: "4px 0" }}>
-                    <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                      {statement.resourceIdentifier}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "12px",
+                      padding: "8px 4px",
+                      minWidth: "200px",
+                    }}
+                  >
+                    <FilePdfTwoTone
+                      twoToneColor="#6366f1"
+                      style={{ fontSize: 28, marginTop: 2 }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          marginBottom: 4,
+                          fontSize: 14,
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {formatCardName(statement.resourceIdentifier)}
+                      </div>
+                      <Text
+                        type="secondary"
+                        style={{
+                          fontSize: 12,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                        }}
+                      >
+                        <CalendarOutlined style={{ fontSize: 11 }} />
+                        {formatDate(statement.period?.end)}
+                      </Text>
                     </div>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      {formatDate(statement.period?.end)}
-                    </Text>
                   </div>
                 ),
                 key: id,
                 children: <PdfViewer statement={statement} />,
-                icon: <FilePdfFilled />,
               };
             })}
           />
@@ -314,7 +460,7 @@ export default function Statements({ view = "tab", cardSelected }) {
                       title={
                         <div style={{ textAlign: "center", marginBottom: 8 }}>
                           <Text strong style={{ fontSize: 14 }}>
-                            {statement.resourceIdentifier}
+                            {formatCardName(statement.resourceIdentifier)}
                           </Text>
                         </div>
                       }
@@ -362,7 +508,7 @@ export default function Statements({ view = "tab", cardSelected }) {
             <FilePdfTwoTone twoToneColor="#6366f1" style={{ fontSize: 24 }} />
             <div>
               <div style={{ fontWeight: 600, fontSize: 16 }}>
-                {selectedStatement?.resourceIdentifier}
+                {formatCardName(selectedStatement?.resourceIdentifier)}
               </div>
               <Text type="secondary" style={{ fontSize: 13 }}>
                 {formatDate(selectedStatement?.period?.end)}
@@ -380,6 +526,13 @@ export default function Statements({ view = "tab", cardSelected }) {
       >
         <PdfViewer statement={selectedStatement} />
       </Modal>
+
+      {/* Statement Sync Result Modal */}
+      <StatementSyncResultModal
+        visible={syncResultModalVisible}
+        results={syncResults}
+        onClose={() => setSyncResultModalVisible(false)}
+      />
     </div>
   );
 }

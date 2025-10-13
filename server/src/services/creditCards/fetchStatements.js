@@ -80,6 +80,7 @@ function extractCardNumberFromSubject(subject) {
  *   - "statement_XX9003.pdf" → "XX9003"
  *   - "Card_ending_2376.pdf" → "XX2376"
  *   - "ICICI_VISA_XX5000_Statement.pdf" → "XX5000"
+ *   - "3718734652902115_25092025.pdf" → "XX2115" (SBI: last 4 of 16-digit card)
  */
 function extractCardNumberFromFilename(filename) {
   // Try to find XX## or XX#### pattern (2 to 4 digits)
@@ -94,7 +95,16 @@ function extractCardNumberFromFilename(filename) {
     return `XX${endingMatch[1]}`;
   }
 
-  // Try to find any 2 to 4 consecutive digits
+  // Try to find a long number (12-16 digits) - likely full card number (SBI format)
+  // Extract last 4 digits
+  const longNumberMatch = filename.match(/(\d{12,16})/);
+  if (longNumberMatch) {
+    const fullNumber = longNumberMatch[1];
+    const last4 = fullNumber.slice(-4);
+    return `XX${last4}`;
+  }
+
+  // Try to find any 2 to 4 consecutive digits (fallback)
   const digitsMatch = filename.match(/(\d{2,4})/);
   if (digitsMatch) {
     return `XX${digitsMatch[1]}`;
@@ -168,27 +178,33 @@ function matchCardNumber(extractedCardNumber, configuredCards) {
 
 /**
  * Extract statement period from email subject
- * Supports both AXIS and ICICI format
+ * Supports AXIS, ICICI, and SBI formats
+ * Month names are normalized to title case (e.g., "SEPTEMBER" → "September")
  *
- * AXIS: "Statement ending XX76 - September 2025"
- * ICICI: "period August 16 2025 to September 15 2025"
+ * AXIS: "Statement ending XX76 - September 2025" (or "SEPTEMBER 2025")
+ * ICICI: "period August 16 2025 to September 15 2025" (or "AUGUST" / "SEPTEMBER")
+ * SBI: "SimplySAVE - SBI Card Monthly Statement -Sep 2025" (or "SEP 2025")
  *
  * @returns {Object} { startISO, endISO } in YYYY-MM-DD format
  */
 function extractStatementPeriod(subject, resourceConfig) {
-  // Try AXIS format
+  // Try AXIS format: "statement ending XX76 - September 2025" or "SEPTEMBER 2025"
   const axisRe = /statement ending \w+ - ([A-Za-z]+ \d{4})/i;
   const axisMatch = subject.match(axisRe);
   if (axisMatch) {
     const [month, year] = axisMatch[1].split(" ");
+    // Normalize month to title case (e.g., "SEPTEMBER" → "September")
+    const normalizedMonth =
+      month.charAt(0).toUpperCase() + month.slice(1).toLowerCase();
+
     const startISO = new Date(
-      `${month} ${resourceConfig.statementGenerationDay}, ${year}`
+      `${normalizedMonth} ${resourceConfig.statementGenerationDay}, ${year}`
     )
       .toISOString()
       .split("T")[0];
     const endISO = new Date(
       year,
-      new Date(`${month} 1, ${year}`).getMonth() + 1,
+      new Date(`${normalizedMonth} 1, ${year}`).getMonth() + 1,
       0
     )
       .toISOString()
@@ -196,15 +212,57 @@ function extractStatementPeriod(subject, resourceConfig) {
     return { startISO, endISO };
   }
 
-  // Try ICICI format
+  // Try ICICI format: "period August 16 2025 to September 15 2025"
   const iciciRe =
-    /period\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4})\s+to\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i;
+    /period\s+([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})\s+to\s+([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/i;
   const iciciMatch = subject.match(iciciRe);
   if (iciciMatch) {
-    const startDate = iciciMatch[1];
-    const endDate = iciciMatch[2];
+    const [_, startMonth, startDay, startYear, endMonth, endDay, endYear] =
+      iciciMatch;
+    // Normalize months to title case (e.g., "AUGUST" → "August")
+    const normalizedStartMonth =
+      startMonth.charAt(0).toUpperCase() + startMonth.slice(1).toLowerCase();
+    const normalizedEndMonth =
+      endMonth.charAt(0).toUpperCase() + endMonth.slice(1).toLowerCase();
+
+    const startDate = `${normalizedStartMonth} ${startDay} ${startYear}`;
+    const endDate = `${normalizedEndMonth} ${endDay} ${endYear}`;
     const startISO = new Date(startDate).toISOString().split("T")[0];
     const endISO = new Date(endDate).toISOString().split("T")[0];
+    return { startISO, endISO };
+  }
+
+  // Try SBI format: "SimplySAVE - SBI Card Monthly Statement -Sep 2025" or "Statement -Sep 2025"
+  const sbiRe = /Statement\s+-?([A-Za-z]{3})\s+(\d{4})/i;
+  const sbiMatch = subject.match(sbiRe);
+  if (sbiMatch) {
+    const month = sbiMatch[1]; // "Sep" or "SEP"
+    const year = sbiMatch[2]; // "2025"
+
+    // Normalize short month to title case (e.g., "SEP" → "Sep")
+    const normalizedMonth =
+      month.charAt(0).toUpperCase() + month.slice(1).toLowerCase();
+
+    // Convert short month to full month name
+    const fullMonth = new Date(`${normalizedMonth} 1, ${year}`).toLocaleString(
+      "en-US",
+      {
+        month: "long",
+      }
+    );
+
+    const startISO = new Date(
+      `${fullMonth} ${resourceConfig.statementGenerationDay}, ${year}`
+    )
+      .toISOString()
+      .split("T")[0];
+    const endISO = new Date(
+      year,
+      new Date(`${fullMonth} 1, ${year}`).getMonth() + 1,
+      0
+    )
+      .toISOString()
+      .split("T")[0];
     return { startISO, endISO };
   }
 
@@ -234,7 +292,12 @@ const fetchStatements = async (gmail, drive, resourceConfig) => {
 
   if (!messages || messages.length === 0) {
     console.log(`   ⚠️  No statement emails found`);
-    return;
+    return {
+      processed: 0,
+      skipped: 0,
+      errors: 0,
+      newStatements: [],
+    };
   }
 
   console.log(`   ✅ Found ${messages.length} statement email(s)\n`);
@@ -242,6 +305,7 @@ const fetchStatements = async (gmail, drive, resourceConfig) => {
   let processed = 0;
   let skipped = 0;
   let errors = 0;
+  const newStatements = [];
 
   for (const message of messages) {
     try {
@@ -277,33 +341,41 @@ const fetchStatements = async (gmail, drive, resourceConfig) => {
 
       console.log(`   📎 Attachment: ${attachmentPart.filename}`);
 
-      // Extract card number from subject line or filename
-      const extractedCardNumber = extractCardNumber(
-        subject,
-        attachmentPart.filename
-      );
+      // Determine card number
+      let cardNumber;
 
-      if (!extractedCardNumber) {
-        console.log(`   ⚠️  Could not extract card number, skipping`);
-        skipped++;
-        continue;
-      }
-
-      // Match against configured cards (handles partial matches for AXIS)
-      const cardNumber = matchCardNumber(
-        extractedCardNumber,
-        resourceConfig.cards
-      );
-
-      if (!cardNumber) {
+      // If only one card configured for this resource, use it directly (e.g., SBI)
+      if (resourceConfig.cards.length === 1) {
+        cardNumber = resourceConfig.cards[0];
         console.log(
-          `   ⚠️  Card ${extractedCardNumber} not in configured cards [${resourceConfig.cards.join(", ")}], skipping`
+          `   💳 Card: ${cardNumber} (only card configured for ${resourceConfig.identifierPrefix})`
         );
-        skipped++;
-        continue;
-      }
+      } else {
+        // Multiple cards configured, need to extract and match (e.g., ICICI, AXIS)
+        const extractedCardNumber = extractCardNumber(
+          subject,
+          attachmentPart.filename
+        );
 
-      console.log(`   💳 Card: ${cardNumber}`);
+        if (!extractedCardNumber) {
+          console.log(`   ⚠️  Could not extract card number, skipping`);
+          skipped++;
+          continue;
+        }
+
+        // Match against configured cards (handles partial matches for AXIS)
+        cardNumber = matchCardNumber(extractedCardNumber, resourceConfig.cards);
+
+        if (!cardNumber) {
+          console.log(
+            `   ⚠️  Card ${extractedCardNumber} not in configured cards [${resourceConfig.cards.join(", ")}], skipping`
+          );
+          skipped++;
+          continue;
+        }
+
+        console.log(`   💳 Card: ${cardNumber}`);
+      }
 
       // Extract statement data from email body
       const bodyData =
@@ -327,11 +399,9 @@ const fetchStatements = async (gmail, drive, resourceConfig) => {
         `   📅 Period: ${periodInfo.startISO} to ${periodInfo.endISO}`
       );
 
-      // Prepare file naming
+      // Prepare file naming (consistent format: card_BANK_XXNNNN_YYYY-MM-DD.pdf)
       const resourceIdentifier = `${resourceConfig.identifierPrefix}${cardNumber}`;
-      const fileName = statementData.statementPeriod
-        ? `${resourceIdentifier}_${statementData.statementPeriod}.pdf`
-        : `${resourceIdentifier}_${periodInfo.startISO}.pdf`;
+      const fileName = `${resourceIdentifier}_${periodInfo.startISO}.pdf`;
 
       console.log(`   📁 File: ${fileName}`);
 
@@ -352,7 +422,7 @@ const fetchStatements = async (gmail, drive, resourceConfig) => {
       }
 
       // Save statement metadata to Firebase
-      await prepareStatementObjectAndSaveInDB(
+      const saveResult = await prepareStatementObjectAndSaveInDB(
         message.id,
         subject,
         resourceIdentifier,
@@ -363,6 +433,15 @@ const fetchStatements = async (gmail, drive, resourceConfig) => {
         },
         statementData
       );
+
+      if (saveResult && saveResult.isNew) {
+        newStatements.push({
+          ...saveResult.statement,
+          subject,
+          cardNumber,
+          displayName: `${resourceConfig.label} XX${cardNumber.slice(-4)}`,
+        });
+      }
 
       console.log(`   ✅ Statement processing complete\n`);
       processed++;
@@ -379,6 +458,14 @@ const fetchStatements = async (gmail, drive, resourceConfig) => {
   console.log(`   Processed: ${processed}`);
   console.log(`   Skipped: ${skipped}`);
   console.log(`   Errors: ${errors}`);
+  console.log(`   New statements: ${newStatements.length}`);
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+
+  return {
+    processed,
+    skipped,
+    errors,
+    newStatements,
+  };
 };
 export { fetchStatements };

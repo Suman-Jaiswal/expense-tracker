@@ -99,7 +99,7 @@ export const prepareStatementObjectAndSaveInDB = async (
     console.log(
       `   ✅ Statement metadata already exists in Firebase (${period.start} to ${period.end})`
     );
-    return;
+    return { isNew: false, statement: existingByPeriod };
   }
 
   // Check for duplicate by message ID (secondary check)
@@ -108,12 +108,12 @@ export const prepareStatementObjectAndSaveInDB = async (
     console.log(
       `   ✅ Statement metadata already exists in Firebase (message ID: ${messageId})`
     );
-    return;
+    return { isNew: false, statement: null };
   }
 
   // Statement doesn't exist in Firebase, add it
   console.log(`   💾 Statement metadata not found in Firebase, saving...`);
-  await addStatement({
+  const newStatement = {
     id: messageId,
     resourceIdentifier,
     driveFileId: driveRes.id,
@@ -121,6 +121,8 @@ export const prepareStatementObjectAndSaveInDB = async (
     driveFileWebContentLink: driveRes.webContentLink,
     period,
     statementData,
-  });
+  };
+  await addStatement(newStatement);
   console.log(`   ✅ Statement metadata saved to Firebase`);
+  return { isNew: true, statement: newStatement };
 };

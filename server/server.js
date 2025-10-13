@@ -76,10 +76,23 @@ export function startServer() {
         "/sync-statements",
         asyncHandler(async (req, res) => {
           console.log("Starting statement synchronization...");
-          await fetchAllStatements(gmail, drive);
+          const results = await fetchAllStatements(gmail, drive);
+
+          const message =
+            results.total === 0
+              ? "No new statements found"
+              : `${results.total} new statement(s) synchronized successfully`;
+
           res.json({
             success: true,
-            message: "Statements synchronized successfully",
+            message,
+            stats: {
+              total: results.total,
+              skipped: results.skipped,
+              failed: results.failed,
+            },
+            newStatements: results.newStatements,
+            byResource: results.byResource,
             timestamp: new Date().toISOString(),
           });
         })
@@ -236,6 +249,185 @@ export function startServer() {
             success: true,
             message: `${transactions.length} transaction(s) added successfully`,
             count: transactions.length,
+            timestamp: new Date().toISOString(),
+          });
+        })
+      );
+
+      // Add manual transaction from review
+      app.post(
+        "/transactions/manual",
+        asyncHandler(async (req, res) => {
+          const {
+            resourceIdentifier,
+            statementId,
+            date,
+            description,
+            amount,
+            type,
+            category,
+            merchant,
+          } = req.body;
+
+          // Validate required fields
+          if (
+            !resourceIdentifier ||
+            !statementId ||
+            !date ||
+            !description ||
+            !amount ||
+            !type
+          ) {
+            return res.status(400).json({
+              success: false,
+              error: "Missing required fields",
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          // Generate deterministic ID
+          const crypto = await import("crypto");
+          const idData = `${resourceIdentifier}|${date}|${description}|${amount}|${type}`;
+          const id = `txn_${crypto.default
+            .createHash("md5")
+            .update(idData)
+            .digest("hex")
+            .substring(0, 16)}`;
+
+          const transaction = {
+            id,
+            resourceIdentifier,
+            statementId,
+            date,
+            description,
+            merchant: merchant || description,
+            amount: parseFloat(amount),
+            type,
+            category: category || "Other",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          await addMultipleTransactions([transaction]);
+
+          res.status(201).json({
+            success: true,
+            message: "Transaction added successfully",
+            transaction,
+            timestamp: new Date().toISOString(),
+          });
+        })
+      );
+
+      // Update existing transaction
+      app.patch(
+        "/transactions/:id",
+        asyncHandler(async (req, res) => {
+          const { id } = req.params;
+          const updates = req.body;
+
+          // Import Firebase functions
+          const { doc, updateDoc } = await import("firebase/firestore");
+          const { db } = await import("./firebase.js");
+
+          const transactionRef = doc(db, "transactions", id);
+
+          // Prepare update data
+          const updateData = {
+            ...updates,
+            updatedAt: new Date().toISOString(),
+          };
+
+          await updateDoc(transactionRef, updateData);
+
+          res.json({
+            success: true,
+            message: "Transaction updated successfully",
+            timestamp: new Date().toISOString(),
+          });
+        })
+      );
+
+      console.log("✅ Registering /transactions/test route...");
+      // Test route
+      app.get("/transactions/test", (req, res) => {
+        res.json({ success: true, message: "Test route works!" });
+      });
+
+      console.log("✅ Registering /transactions/ambiguous route...");
+      // Get ambiguous transactions
+      app.get(
+        "/transactions/ambiguous",
+        asyncHandler(async (req, res) => {
+          const { collection, getDocs, query, where } = await import(
+            "firebase/firestore"
+          );
+          const { db } = await import("./firebase.js");
+
+          const transactionsRef = collection(db, "transactions");
+          const q = query(transactionsRef, where("isAmbiguous", "==", true));
+          const snapshot = await getDocs(q);
+
+          const ambiguousTransactions = [];
+          snapshot.forEach((doc) => {
+            ambiguousTransactions.push({
+              id: doc.id,
+              ...doc.data(),
+            });
+          });
+
+          res.json({
+            success: true,
+            count: ambiguousTransactions.length,
+            transactions: ambiguousTransactions,
+            timestamp: new Date().toISOString(),
+          });
+        })
+      );
+
+      // Check for new statements
+      app.get(
+        "/statements/check-new",
+        asyncHandler(async (req, res) => {
+          const { collection, getDocs, query, orderBy, limit } = await import(
+            "firebase/firestore"
+          );
+          const { db } = await import("./firebase.js");
+
+          // Get the most recent statement date
+          const statementsRef = collection(db, "statements");
+          const q = query(
+            statementsRef,
+            orderBy("period.end", "desc"),
+            limit(1)
+          );
+          const snapshot = await getDocs(q);
+
+          let lastStatementDate = null;
+          if (!snapshot.empty) {
+            const lastStatement = snapshot.docs[0].data();
+            lastStatementDate = lastStatement.period.end;
+          }
+
+          // Calculate if we're likely to have new statements
+          const daysSinceLastStatement = lastStatementDate
+            ? Math.floor(
+                (new Date() - new Date(lastStatementDate)) /
+                  (1000 * 60 * 60 * 24)
+              )
+            : 999;
+
+          // Statements typically come monthly (25-30 days)
+          const hasNewStatements = daysSinceLastStatement >= 25;
+
+          res.json({
+            success: true,
+            hasNewStatements,
+            lastStatementDate,
+            daysSinceLastStatement,
+            message: hasNewStatements
+              ? "New statements may be available"
+              : `Last statement was ${daysSinceLastStatement} days ago`,
             timestamp: new Date().toISOString(),
           });
         })

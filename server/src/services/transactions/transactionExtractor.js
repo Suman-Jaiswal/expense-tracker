@@ -187,6 +187,8 @@ function parseTransactionDate(dateStr) {
     /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/,
     // DD MMM YYYY or DD-MMM-YYYY
     /(\d{1,2})\s*([A-Z]{3})\s*(\d{4})/i,
+    // DD MMM YY or DD-MMM-YY (2-digit year)
+    /(\d{1,2})\s*([A-Z]{3})\s*(\d{2})$/i,
     // MMM DD, YYYY
     /([A-Z]{3})\s*(\d{1,2}),?\s*(\d{4})/i,
   ];
@@ -203,6 +205,12 @@ function parseTransactionDate(dateStr) {
         } else if (regex === formats[1]) {
           // DD MMM YYYY
           date = new Date(dateStr);
+        } else if (regex === formats[2]) {
+          // DD MMM YY (2-digit year) - convert to 4-digit year
+          const [, day, month, year] = match;
+          // Assume 20XX for years 00-99
+          const fullYear = `20${year}`;
+          date = new Date(`${day} ${month} ${fullYear}`);
         } else {
           // MMM DD, YYYY
           date = new Date(dateStr);
@@ -248,6 +256,7 @@ function parseAmount(amountStr) {
  */
 function extractAxisTransactions(text) {
   const transactions = [];
+  const ambiguousTransactions = [];
   const lines = text.split("\n").map((l) => l.trim());
 
   // AXIS format: DD/MM/YYYY{Description}{Category}{Amount Dr/Cr}{Cashback Cr}
@@ -293,22 +302,46 @@ function extractAxisTransactions(text) {
           amount + " " + type
         );
 
-        const transaction = {
-          date: parseTransactionDate(date),
-          description: description,
-          merchant: extractMerchant(description),
-          amount: parsedAmount,
-          type: txnType,
-          category: categorizeTransaction(description),
-          rawText: line,
-        };
+        // Check for ambiguous patterns
+        const isAmbiguous =
+          // Multiple amounts in line (cashback scenarios)
+          (line.match(/\d+\.\d{2}\s+(Dr|Cr)/gi) || []).length > 1 ||
+          // No clear space between category and amount
+          /[A-Z]{2,}\d+\.\d{2}/.test(line) ||
+          // Very large amount (potential parsing error)
+          parsedAmount > 500000;
 
-        transactions.push(transaction);
+        if (isAmbiguous) {
+          ambiguousTransactions.push({
+            date: parseTransactionDate(date),
+            rawLine: line,
+            description,
+            suggestedAmount: parsedAmount,
+            type: txnType,
+            reason:
+              (line.match(/\d+\.\d{2}\s+(Dr|Cr)/gi) || []).length > 1
+                ? "multiple_amounts"
+                : "concatenated_text",
+            category: categorizeTransaction(description),
+          });
+        } else {
+          const transaction = {
+            date: parseTransactionDate(date),
+            description: description,
+            merchant: extractMerchant(description),
+            amount: parsedAmount,
+            type: txnType,
+            category: categorizeTransaction(description),
+            rawText: line,
+          };
+
+          transactions.push(transaction);
+        }
       }
     }
   }
 
-  return transactions;
+  return { transactions, ambiguousTransactions };
 }
 
 /**
@@ -316,6 +349,7 @@ function extractAxisTransactions(text) {
  */
 function extractIciciTransactions(text) {
   const transactions = [];
+  const ambiguousTransactions = [];
   const lines = text.split("\n").map((l) => l.trim());
 
   // Pattern 1: Capture everything after ref number, then parse amount from end
@@ -382,15 +416,38 @@ function extractIciciTransactions(text) {
           const { amount: parsedAmount, type: txnType } =
             parseAmount(amountStr);
 
-          transactions.push({
-            date: parseTransactionDate(date),
-            description: description.trim(),
-            merchant: extractMerchant(description),
-            amount: parsedAmount,
-            type: txnType,
-            category: categorizeTransaction(description),
-            rawText: line,
-          });
+          // Check for ambiguous patterns
+          const isAmbiguous =
+            // Amount without decimal (potential parsing error)
+            !amount.includes(".") ||
+            // Very large amount (potential parsing error)
+            parsedAmount > 500000 ||
+            // Description too short (amount might have captured wrong digits)
+            description.trim().length < 5;
+
+          if (isAmbiguous) {
+            ambiguousTransactions.push({
+              date: parseTransactionDate(date),
+              rawLine: line,
+              description: description.trim(),
+              suggestedAmount: parsedAmount,
+              type: txnType,
+              reason: !amount.includes(".")
+                ? "missing_decimal"
+                : "suspicious_amount",
+              category: categorizeTransaction(description),
+            });
+          } else {
+            transactions.push({
+              date: parseTransactionDate(date),
+              description: description.trim(),
+              merchant: extractMerchant(description),
+              amount: parsedAmount,
+              type: txnType,
+              category: categorizeTransaction(description),
+              rawText: line,
+            });
+          }
           continue;
         }
       }
@@ -423,12 +480,125 @@ function extractIciciTransactions(text) {
     }
   }
 
-  return transactions;
+  return { transactions, ambiguousTransactions };
 }
 
 /**
  * Generic transaction extractor (fallback)
  */
+/**
+ * Extract transactions from SBI Card statement
+ */
+function extractSbiTransactions(text) {
+  const transactions = [];
+  const ambiguousTransactions = []; // Track transactions needing manual review
+  const lines = text.split("\n").map((l) => l.trim());
+
+  // SBI format: DD MMM YY{Description}{Amount}C/D
+  // Example: 26 Aug 25UPI-LALAN KUMAR CHAUDHA30,000.00D
+  // Example: 29 Aug 25PAYMENT RECEIVED 000BD015241BAIAAABFFSJT40,064.30C
+  // Using two-step parsing to avoid capturing concatenated amounts or reward points
+
+  let inTransactionSection = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Start of transaction section
+    if (
+      line.includes("TRANSACTIONS FOR") ||
+      line.includes("Transaction Details") ||
+      (line.includes("Date") && line.includes("Amount"))
+    ) {
+      inTransactionSection = true;
+      continue;
+    }
+
+    // End of transaction section
+    if (
+      inTransactionSection &&
+      (line.includes("SHOP & SMILE SUMMARY") ||
+        line.includes("Points Expiry") ||
+        line.includes("Previous Balance") ||
+        line.includes("Fee, Taxes") ||
+        line.match(/^\d+$/) || // Single number (like total count)
+        line.length === 0)
+    ) {
+      if (
+        line.includes("SHOP & SMILE SUMMARY") ||
+        line.includes("Points Expiry")
+      ) {
+        break; // Definitely end
+      }
+      continue;
+    }
+
+    if (inTransactionSection && line.match(/^\d{2}\s+[A-Z]{3}\s+\d{2}/i)) {
+      // Two-step parsing to avoid capturing concatenated amounts
+      // Step 1: Extract date
+      const dateMatch = line.match(/^(\d{2}\s+[A-Z]{3}\s+\d{2})(.+)$/i);
+      if (dateMatch) {
+        const [, date, restOfLine] = dateMatch;
+
+        // Step 2: Extract amount+type from the END of the line
+        // This ensures we only capture the last amount, not reward points
+        const amountMatch = restOfLine.match(/([\d,]+\.\d{2})([CD])$/i);
+        if (amountMatch) {
+          const amount = amountMatch[1];
+          const typeIndicator = amountMatch[2];
+
+          // Step 3: Description is everything before the amount
+          const descriptionEndIndex = restOfLine.lastIndexOf(amount);
+          const beforeAmount = restOfLine.substring(0, descriptionEndIndex);
+
+          // Check if there are digits immediately before the amount (concatenated without space)
+          // e.g., "XO887815,199.37" where "887815" is concatenated
+          const concatenatedDigits = beforeAmount.match(/(\d+)$/);
+          if (concatenatedDigits) {
+            // Track ambiguous transaction for manual review
+            const parsedDate = parseTransactionDate(date);
+            if (parsedDate) {
+              ambiguousTransactions.push({
+                date: parsedDate,
+                rawLine: line,
+                description: beforeAmount.trim(),
+                suggestedAmount: amountNum,
+                type: typeIndicator.toUpperCase() === "D" ? "debit" : "credit",
+                reason: "concatenated_amount",
+                category: categorizeTransaction(beforeAmount.trim()),
+              });
+            }
+            continue;
+          }
+
+          const description = beforeAmount.trim();
+
+          // Validate the amount format
+          const amountNum = parseFloat(amount.replace(/,/g, ""));
+          if (isNaN(amountNum) || amountNum <= 0) continue;
+
+          // Parse date
+          const parsedDate = parseTransactionDate(date);
+          if (!parsedDate) continue;
+
+          const transaction = {
+            date: parsedDate,
+            description: description,
+            merchant: extractMerchant(description),
+            amount: amountNum,
+            type: typeIndicator.toUpperCase() === "D" ? "debit" : "credit",
+            category: categorizeTransaction(description),
+          };
+
+          transactions.push(transaction);
+        }
+      }
+    }
+  }
+
+  return { transactions, ambiguousTransactions };
+}
+
 function extractGenericTransactions(text) {
   const transactions = [];
   const lines = text.split("\n");
@@ -558,13 +728,27 @@ export async function extractTransactionsFromPDF(
 
     // Extract transactions based on bank
     let transactions;
+    let ambiguousTransactions = [];
+
     switch (bank) {
-      case "AXIS":
-        transactions = extractAxisTransactions(text);
+      case "AXIS": {
+        const axisResult = extractAxisTransactions(text);
+        transactions = axisResult.transactions;
+        ambiguousTransactions = axisResult.ambiguousTransactions;
         break;
-      case "ICICI":
-        transactions = extractIciciTransactions(text);
+      }
+      case "ICICI": {
+        const iciciResult = extractIciciTransactions(text);
+        transactions = iciciResult.transactions;
+        ambiguousTransactions = iciciResult.ambiguousTransactions;
         break;
+      }
+      case "SBI": {
+        const sbiResult = extractSbiTransactions(text);
+        transactions = sbiResult.transactions;
+        ambiguousTransactions = sbiResult.ambiguousTransactions;
+        break;
+      }
       default:
         transactions = extractGenericTransactions(text);
     }
@@ -572,11 +756,21 @@ export async function extractTransactionsFromPDF(
     console.log(
       `✅ Extracted ${transactions.length} transactions (regex method)`
     );
+    if (ambiguousTransactions.length > 0) {
+      console.log(
+        `⚠️  ${ambiguousTransactions.length} transaction(s) need manual review`
+      );
+    }
 
     // Add metadata with deterministic IDs
     const result = {
       bank,
       totalTransactions: transactions.length,
+      ambiguousCount: ambiguousTransactions.length,
+      ambiguousTransactions: ambiguousTransactions.map((txn) => ({
+        ...txn,
+        resourceIdentifier,
+      })),
       transactions: transactions.map((txn) => ({
         id: generateTransactionId(
           resourceIdentifier,
@@ -605,13 +799,27 @@ export function extractTransactionsFromText(text) {
   const bank = detectBank(text);
 
   let transactions;
+  let ambiguousTransactions = [];
+
   switch (bank) {
-    case "AXIS":
-      transactions = extractAxisTransactions(text);
+    case "AXIS": {
+      const axisResult = extractAxisTransactions(text);
+      transactions = axisResult.transactions;
+      ambiguousTransactions = axisResult.ambiguousTransactions;
       break;
-    case "ICICI":
-      transactions = extractIciciTransactions(text);
+    }
+    case "ICICI": {
+      const iciciResult = extractIciciTransactions(text);
+      transactions = iciciResult.transactions;
+      ambiguousTransactions = iciciResult.ambiguousTransactions;
       break;
+    }
+    case "SBI": {
+      const sbiResult = extractSbiTransactions(text);
+      transactions = sbiResult.transactions;
+      ambiguousTransactions = sbiResult.ambiguousTransactions;
+      break;
+    }
     default:
       transactions = extractGenericTransactions(text);
   }
@@ -619,6 +827,8 @@ export function extractTransactionsFromText(text) {
   return {
     bank,
     totalTransactions: transactions.length,
+    ambiguousCount: ambiguousTransactions.length,
+    ambiguousTransactions,
     transactions: transactions.map((txn) => ({
       id: generateTransactionId(
         "temp", // Will be replaced with actual resourceIdentifier later

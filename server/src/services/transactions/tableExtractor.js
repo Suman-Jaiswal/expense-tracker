@@ -57,6 +57,11 @@ function isEndMarker(line) {
     "payment due",
     "minimum amount",
     "total transactions",
+    "shop & smile",
+    "points expiry",
+    "previous balance",
+    "earned",
+    "redeemed",
   ];
 
   const lowerLine = line.toLowerCase();
@@ -73,6 +78,8 @@ function isStartMarker(line) {
     "domestic transactions",
     "international transactions",
     "transaction date",
+    "transactions for",
+    "date amount",
   ];
 
   const lowerLine = line.toLowerCase();
@@ -130,10 +137,21 @@ function parseDate(dateStr) {
       }
     }
 
-    // DD-MMM-YY
-    const match3 = dateStr.match(/(\d{1,2})-([A-Z]{3})-(\d{2})/i);
+    // DD MMM YY (2-digit year)
+    const match3 = dateStr.match(/^(\d{1,2})\s*([A-Z]{3})\s*(\d{2})$/i);
     if (match3) {
       const [, day, month, year] = match3;
+      const fullYear = `20${year}`; // Assume 20XX
+      const date = new Date(`${day} ${month} ${fullYear}`);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString().split("T")[0];
+      }
+    }
+
+    // DD-MMM-YY
+    const match4 = dateStr.match(/(\d{1,2})-([A-Z]{3})-(\d{2})/i);
+    if (match4) {
+      const [, day, month, year] = match4;
       const fullYear = parseInt(year) > 50 ? `19${year}` : `20${year}`;
       const date = new Date(`${day} ${month} ${fullYear}`);
       if (!isNaN(date.getTime())) {
@@ -243,9 +261,34 @@ function extractMerchant(description) {
  * Split line into columns based on spacing
  */
 function splitIntoColumns(line) {
-  // Split on 2+ consecutive spaces (common in tabular data)
-  const columns = line.split(/\s{2,}/).filter((col) => col.trim());
-  return columns;
+  // Try different splitting strategies
+
+  // Strategy 1: Split on 2+ consecutive spaces (common in tabular data)
+  let columns = line.split(/\s{2,}/).filter((col) => col.trim());
+  if (columns.length >= 3) {
+    return columns;
+  }
+
+  // Strategy 2: For compact formats (like SBI), try to extract date, description, amount pattern
+  // Pattern: DD MMM YY<Description><Amount>C/D
+  const compactMatch = line.match(
+    /^(\d{2}\s+[A-Z]{3}\s+\d{2})(.+?)([\d,]+\.\d{2})([CD])$/i
+  );
+  if (compactMatch) {
+    const [, date, description, amount, typeIndicator] = compactMatch;
+    return [date.trim(), description.trim(), amount + typeIndicator];
+  }
+
+  // Strategy 3: Try to split on single space if we have clear date pattern
+  if (line.match(/^\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}/)) {
+    columns = line.split(/\s+/).filter((col) => col.trim());
+    if (columns.length >= 3) {
+      return columns;
+    }
+  }
+
+  // Fallback: Return as single column (will be filtered out later)
+  return [line.trim()];
 }
 
 /**
