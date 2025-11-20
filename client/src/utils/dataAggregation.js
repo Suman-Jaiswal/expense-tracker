@@ -40,6 +40,8 @@ export const getMonthlyTrends = (transactions, months = 6) => {
 
   const monthsData = [];
   const today = new Date();
+  let cumulativeSpending = 0;
+  let cumulativeIncome = 0;
 
   for (let i = months - 1; i >= 0; i--) {
     const monthDate = subMonths(today, i);
@@ -49,12 +51,16 @@ export const getMonthlyTrends = (transactions, months = 6) => {
     const spending = calculateTotalSpending(transactions, monthStart, monthEnd);
     const income = calculateTotalIncome(transactions, monthStart, monthEnd);
 
+    // Add to cumulative totals
+    cumulativeSpending += spending;
+    cumulativeIncome += income;
+
     monthsData.push({
       month: format(monthDate, "MMM"),
       fullDate: format(monthDate, "MMM yyyy"),
-      spending,
-      income,
-      net: income - spending,
+      spending: cumulativeSpending,
+      income: cumulativeIncome,
+      net: cumulativeIncome - cumulativeSpending,
     });
   }
 

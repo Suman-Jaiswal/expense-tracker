@@ -1,5 +1,5 @@
 import { Alert, Layout, Spin, theme } from "antd";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ContentPage from "./components/ContentPage";
 import ErrorBoundary from "./components/ErrorBoundary";
 import MenuBar from "./components/MenuBar";
@@ -18,6 +18,17 @@ const App = () => {
   const { resources, resourceIdentifier, loading, error } = state;
   const { setResourceIdentifier } = actions;
   const [mobileNav, setMobileNav] = useState("dashboard");
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  // Handle screen resize
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   if (loading) {
     return (
@@ -58,7 +69,8 @@ const App = () => {
     <ErrorBoundary>
       <Layout style={{ minHeight: "100vh" }}>
         <Layout>
-          {featureFlag.isSideMenuEnabled && (
+          {/* Desktop Left Sidebar - Only show on desktop */}
+          {featureFlag.isSideMenuEnabled && !isMobile && (
             <MenuBar
               resources={resources}
               setResourceIdentifier={(key) => {
@@ -83,11 +95,13 @@ const App = () => {
             />
           </Content>
 
-          {/* Mobile Bottom Navigation */}
-          <MobileBottomNav
-            activeKey={mobileNav}
-            onChange={handleMobileNavChange}
-          />
+          {/* Mobile Bottom Navigation - Only show on mobile */}
+          {isMobile && (
+            <MobileBottomNav
+              activeKey={mobileNav}
+              onChange={handleMobileNavChange}
+            />
+          )}
         </Layout>
       </Layout>
     </ErrorBoundary>

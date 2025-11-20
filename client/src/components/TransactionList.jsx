@@ -114,6 +114,7 @@ export default function TransactionList({ resourceIdentifier }) {
     console.log("Opening edit modal for transaction:", transaction);
     setEditingTransaction(transaction);
     editForm.setFieldsValue({
+      date: transaction.date,
       amount: transaction.amount,
       description: transaction.description,
       category: transaction.category,
@@ -636,6 +637,14 @@ export default function TransactionList({ resourceIdentifier }) {
         ]}
       >
         <Form form={editForm} layout="vertical">
+          <Form.Item
+            name="date"
+            label="Date"
+            rules={[{ required: true, message: "Please enter date" }]}
+          >
+            <Input type="date" />
+          </Form.Item>
+
           <Form.Item
             name="description"
             label="Description"

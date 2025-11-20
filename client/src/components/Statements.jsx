@@ -469,6 +469,16 @@ export default function Statements({ view = "tab", cardSelected }) {
                           <Tag color="blue" icon={<CalendarOutlined />}>
                             {formatDate(statement.period?.end)}
                           </Tag>
+                          {statement.dueAmount && (
+                            <div style={{ marginTop: 8 }}>
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                Due:{" "}
+                              </Text>
+                              <Text strong style={{ color: "#ff4d4f" }}>
+                                ₹{statement.dueAmount.toLocaleString("en-IN")}
+                              </Text>
+                            </div>
+                          )}
                         </div>
                       }
                     />

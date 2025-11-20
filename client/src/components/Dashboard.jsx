@@ -1,48 +1,36 @@
 import {
   ArrowDownOutlined,
-  ArrowUpOutlined,
   CreditCardOutlined,
-  SyncOutlined,
   TransactionOutlined,
 } from "@ant-design/icons";
 import {
-  Button,
   Card,
+  Checkbox,
   Col,
+  Empty,
   Row,
   Statistic,
-  Table,
-  Tag,
   theme,
   Typography,
 } from "antd";
-import { format } from "date-fns";
 import { useEffect, useState } from "react";
-import toast from "react-hot-toast";
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
-  Cell,
   Legend,
   Line,
   LineChart,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { getAllTransactions, syncTransactions } from "../api";
+import { getAllStatements } from "../api";
+import { formatCurrency } from "../utils/dataAggregation";
 import {
-  formatCurrency,
-  getCardWiseSpending,
-  getCategoryBreakdown,
-  getCurrentMonthStats,
-  getMonthlyTrends,
-  getRecentTransactions,
-} from "../utils/dataAggregation";
+  getMonthlySpendByCard,
+  getMonthlySpendByCardNonCumulative,
+  getTotalSpendCurve,
+} from "../utils/statementAggregation";
 
 const COLORS = [
   "#ff6b6b",
@@ -59,105 +47,55 @@ const Dashboard = ({ resources }) => {
   const {
     token: { colorBgLayout },
   } = theme.useToken();
-  const [transactions, setTransactions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState(null);
-  const [syncing, setSyncing] = useState(false);
+  const [statements, setStatements] = useState([]);
+  const [visibleCards, setVisibleCards] = useState([]);
 
   useEffect(() => {
-    fetchTransactions();
+    fetchStatements();
   }, []);
 
-  const fetchTransactions = async () => {
+  const fetchStatements = async () => {
     try {
-      setLoading(true);
-      const data = await getAllTransactions();
-      setTransactions(data || []);
-      const currentStats = getCurrentMonthStats(data || []);
-      setStats(currentStats);
+      const data = await getAllStatements();
+      setStatements(data || []);
     } catch (error) {
-      console.error("Error fetching transactions:", error);
-    } finally {
-      setLoading(false);
+      console.error("Error fetching statements:", error);
     }
   };
 
-  const handleSyncTransactions = async () => {
-    setSyncing(true);
-    try {
-      const result = await syncTransactions();
-      if (result.success) {
-        toast.success(result.message);
-        // Refresh transactions list
-        await fetchTransactions();
-      } else {
-        toast.error(result.message || "Failed to sync transactions");
+  const monthlySpendByCard = getMonthlySpendByCard(statements);
+  const monthlySpendNonCumulative =
+    getMonthlySpendByCardNonCumulative(statements);
+  const totalSpendCurve = getTotalSpendCurve(statements);
+
+  // Extract card names and initialize visible cards
+  useEffect(() => {
+    if (monthlySpendNonCumulative.length > 0) {
+      const cardNames = Object.keys(monthlySpendNonCumulative[0] || {}).filter(
+        (key) => key !== "month"
+      );
+      if (visibleCards.length === 0) {
+        setVisibleCards(cardNames);
       }
-    } catch (error) {
-      toast.error("Failed to sync transactions");
-      console.error(error);
-    } finally {
-      setSyncing(false);
     }
+  }, [monthlySpendNonCumulative]);
+
+  // Toggle card visibility
+  const handleCardToggle = (cardName) => {
+    setVisibleCards((prev) =>
+      prev.includes(cardName)
+        ? prev.filter((name) => name !== cardName)
+        : [...prev, cardName]
+    );
   };
 
-  const monthlyTrends = getMonthlyTrends(transactions, 6);
-  const categoryData = getCategoryBreakdown(transactions);
-  const cardData = getCardWiseSpending(resources);
-  const recentTransactions = getRecentTransactions(transactions, 5);
-
-  const transactionColumns = [
-    {
-      title: "Date",
-      dataIndex: "date",
-      key: "date",
-      render: (date) => {
-        if (!date) return "N/A";
-        try {
-          const dateObj = new Date(date);
-          if (isNaN(dateObj.getTime())) return "Invalid Date";
-          return format(dateObj, "MMM dd, yyyy");
-        } catch (error) {
-          console.error("Error formatting date:", date, error);
-          return "Invalid Date";
-        }
-      },
-    },
-    {
-      title: "Description",
-      dataIndex: "description",
-      key: "description",
-      ellipsis: true,
-    },
-    {
-      title: "Amount",
-      dataIndex: "amount",
-      key: "amount",
-      align: "right",
-      render: (amount, record) => (
-        <span
-          style={{
-            color: record.type === "credit" ? "#52c41a" : "#ff4d4f",
-            fontWeight: 600,
-            fontFamily: "monospace",
-          }}
-        >
-          {record.type === "credit" ? "+" : "-"}
-          {formatCurrency(amount)}
-        </span>
-      ),
-    },
-    {
-      title: "Type",
-      dataIndex: "type",
-      key: "type",
-      render: (type) => (
-        <Tag color={type === "credit" ? "green" : "red"}>
-          {type?.toUpperCase()}
-        </Tag>
-      ),
-    },
-  ];
+  // Get all card names for checkboxes
+  const allCardNames =
+    monthlySpendNonCumulative.length > 0
+      ? Object.keys(monthlySpendNonCumulative[0] || {}).filter(
+          (key) => key !== "month"
+        )
+      : [];
 
   return (
     <div
@@ -181,65 +119,26 @@ const Dashboard = ({ resources }) => {
             📊 Dashboard
           </Typography.Title>
           <Typography.Text type="secondary">
-            Overview of your expenses and spending patterns
+            Overview of your card statements and spending patterns
           </Typography.Text>
         </div>
-        <Button
-          type="primary"
-          icon={<SyncOutlined spin={syncing} />}
-          onClick={handleSyncTransactions}
-          loading={syncing}
-          size="large"
-        >
-          Sync Transactions
-        </Button>
       </div>
 
       {/* Summary Cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8}>
           <Card bordered={false} className="fade-in">
             <Statistic
-              title="Total Spending"
-              value={stats?.spending || 0}
-              precision={0}
-              valueStyle={{ color: "#ff4d4f" }}
-              prefix={<ArrowDownOutlined />}
-              suffix="₹"
-            />
-            <div style={{ marginTop: 8, color: "#8c8c8c", fontSize: 12 }}>
-              {stats?.month}
-            </div>
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false} className="fade-in">
-            <Statistic
-              title="Total Income"
-              value={stats?.income || 0}
-              precision={0}
-              valueStyle={{ color: "#52c41a" }}
-              prefix={<ArrowUpOutlined />}
-              suffix="₹"
-            />
-            <div style={{ marginTop: 8, color: "#8c8c8c", fontSize: 12 }}>
-              {stats?.month}
-            </div>
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false} className="fade-in">
-            <Statistic
-              title="Transactions"
-              value={stats?.transactionCount || 0}
+              title="Total Statements"
+              value={statements?.length || 0}
               prefix={<TransactionOutlined />}
             />
             <div style={{ marginTop: 8, color: "#8c8c8c", fontSize: 12 }}>
-              This month
+              Across all cards
             </div>
           </Card>
         </Col>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8}>
           <Card bordered={false} className="fade-in">
             <Statistic
               title="Active Cards"
@@ -251,120 +150,186 @@ const Dashboard = ({ resources }) => {
             </div>
           </Card>
         </Col>
-      </Row>
-
-      {/* Charts Row */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        {/* Monthly Trends */}
-        <Col xs={24} lg={16}>
-          <Card
-            title="Monthly Spending Trends"
-            bordered={false}
-            className="fade-in"
-          >
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={monthlyTrends}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip
-                  formatter={(value) => formatCurrency(value)}
-                  labelStyle={{ color: "#000" }}
-                />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="spending"
-                  stroke="#ff4d4f"
-                  strokeWidth={2}
-                  name="Spending"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="income"
-                  stroke="#52c41a"
-                  strokeWidth={2}
-                  name="Income"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </Card>
-        </Col>
-
-        {/* Category Breakdown */}
-        <Col xs={24} lg={8}>
-          <Card title="Category Breakdown" bordered={false} className="fade-in">
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={categoryData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) =>
-                    `${name}: ${(percent * 100).toFixed(0)}%`
-                  }
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {categoryData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={COLORS[index % COLORS.length]}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => formatCurrency(value)} />
-              </PieChart>
-            </ResponsiveContainer>
+        <Col xs={24} sm={12} lg={8}>
+          <Card bordered={false} className="fade-in">
+            <Statistic
+              title="Total Spend"
+              value={
+                statements?.reduce(
+                  (sum, stmt) => sum + (stmt.totalSpend || 0),
+                  0
+                ) || 0
+              }
+              precision={0}
+              valueStyle={{ color: "#ff4d4f" }}
+              prefix={<ArrowDownOutlined />}
+              suffix="₹"
+            />
+            <div style={{ marginTop: 8, color: "#8c8c8c", fontSize: 12 }}>
+              From statements
+            </div>
           </Card>
         </Col>
       </Row>
 
-      {/* Card Wise Spending */}
+      {/* Monthly Spend by Card (Non-Cumulative) */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24}>
-          <Card title="Card-wise Spending" bordered={false} className="fade-in">
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={cardData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip
-                  formatter={(value) => formatCurrency(value)}
-                  labelStyle={{ color: "#000" }}
-                />
-                <Legend />
-                <Bar dataKey="spending" fill="#1890ff" name="Outstanding" />
-                <Bar dataKey="limit" fill="#d9d9d9" name="Credit Limit" />
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Recent Transactions */}
-      <Row gutter={[16, 16]}>
-        <Col xs={24}>
           <Card
-            title="Recent Transactions"
+            title="Monthly Spending by Card"
             bordered={false}
             className="fade-in"
             extra={
-              <a href="#transactions" style={{ fontSize: 14 }}>
-                View All
-              </a>
+              allCardNames.length > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "12px",
+                    alignItems: "center",
+                  }}
+                >
+                  {allCardNames.map((cardName, index) => (
+                    <Checkbox
+                      key={cardName}
+                      checked={visibleCards.includes(cardName)}
+                      onChange={() => handleCardToggle(cardName)}
+                      style={{
+                        fontWeight: 500,
+                      }}
+                    >
+                      <span style={{ color: COLORS[index % COLORS.length] }}>
+                        ●
+                      </span>{" "}
+                      {cardName}
+                    </Checkbox>
+                  ))}
+                </div>
+              )
             }
           >
-            <Table
-              columns={transactionColumns}
-              dataSource={recentTransactions}
-              loading={loading}
-              pagination={false}
-              rowKey="id"
-              size="middle"
-            />
+            {monthlySpendNonCumulative.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={monthlySpendNonCumulative}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip
+                    formatter={(value, name) => [formatCurrency(value), name]}
+                    labelStyle={{ color: "#000" }}
+                  />
+                  <Legend />
+                  {Object.keys(monthlySpendNonCumulative[0] || {})
+                    .filter(
+                      (key) => key !== "month" && visibleCards.includes(key)
+                    )
+                    .map((cardName, index) => (
+                      <Line
+                        key={cardName}
+                        type="monotone"
+                        dataKey={cardName}
+                        stroke={
+                          COLORS[allCardNames.indexOf(cardName) % COLORS.length]
+                        }
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                    ))}
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <Empty
+                description="No statement data available"
+                style={{ padding: "40px 0" }}
+              />
+            )}
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Cumulative Spend Curves - Side by Side */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col xs={24} lg={12}>
+          <Card
+            title="Total Spend Curve by Card (Cumulative)"
+            bordered={false}
+            className="fade-in"
+          >
+            {monthlySpendByCard.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={monthlySpendByCard}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip
+                    formatter={(value, name) => [
+                      `Total: ${formatCurrency(value)}`,
+                      name,
+                    ]}
+                    labelStyle={{ color: "#000" }}
+                  />
+                  <Legend />
+                  {Object.keys(monthlySpendByCard[0] || {})
+                    .filter((key) => key !== "month")
+                    .map((cardName, index) => (
+                      <Line
+                        key={cardName}
+                        type="monotone"
+                        dataKey={cardName}
+                        stroke={COLORS[index % COLORS.length]}
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                    ))}
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <Empty
+                description="No statement data available"
+                style={{ padding: "40px 0" }}
+              />
+            )}
+          </Card>
+        </Col>
+        <Col xs={24} lg={12}>
+          <Card
+            title="Total Combined Spend Curve (All Cards)"
+            bordered={false}
+            className="fade-in"
+          >
+            {totalSpendCurve.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={totalSpendCurve}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip
+                    formatter={(value) => [
+                      `Total: ${formatCurrency(value)}`,
+                      "Combined Spend",
+                    ]}
+                    labelStyle={{ color: "#000" }}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="totalSpend"
+                    stroke="#8b5cf6"
+                    strokeWidth={3}
+                    name="Total Spend (All Cards)"
+                    dot={{ r: 5, fill: "#8b5cf6" }}
+                    activeDot={{ r: 7 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <Empty
+                description="No statement data available"
+                style={{ padding: "40px 0" }}
+              />
+            )}
           </Card>
         </Col>
       </Row>

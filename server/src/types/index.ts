@@ -6,24 +6,32 @@ export interface CardMetadata {
   cardName: string;
   bankName: string;
   cardType: "credit" | "debit";
-  cardNumber: string;
-  cardExpiry: string;
-  cardCVV: string;
+  cardNumber: string; // Encrypted full card number
+  cardExpiry: string; // Encrypted expiry date
+  cardCVV: string; // Encrypted CVV
+  lastFourDigits?: string; // Plain text last 4 digits for display
+  cardBrand?: string; // Visa, Mastercard, Amex, RuPay, etc.
 }
 
 export interface Card {
   id: string;
   resourceIdentifier: string;
   metaData: CardMetadata;
-  billingDate: string;
-  dueDate: string;
-  billDue: string;
-  lastBillAmount: string;
-  lastBilledDate: string;
+  // Billing cycle (consider migrating to numbers in future)
+  billingDate: string; // Day of month
+  dueDate: string; // Day of month
+  billDue: string; // Current bill due amount
+  lastBillAmount: string; // Last billed amount
+  lastBilledDate: string; // ISO date string
+  // Financial data (consider migrating to numbers in future)
   creditLimit: string;
-  availableCredit: string;
-  offset: string;
-  outstanding: string;
+  availableCredit: string; // Computed: creditLimit - outstanding
+  offset: string; // Adjustment amount
+  outstanding: string; // Current outstanding amount
+  // Status
+  isDeleted?: boolean;
+  deletedAt?: string;
+  // Audit
   createdAt?: string;
   updatedAt?: string;
 }

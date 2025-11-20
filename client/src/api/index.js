@@ -1,5 +1,12 @@
 import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
 import { db } from "../firebase.js";
+import {
+  decryptCardSensitiveData,
+  detectCardBrand,
+  encryptCardSensitiveData,
+  getLastFourDigits,
+  isEncrypted,
+} from "../utils/encryption.js";
 
 const transactionsCollection = collection(db, "transactions");
 
@@ -12,12 +19,39 @@ export const getAllTransactions = async () => {
   return transactionsList;
 };
 
-export const getAllResources = async () => {
+export const getAllResources = async (decryptCards = false) => {
   const cardsCollection = collection(db, "cards");
   const bankAcoountsCollection = collection(db, "accounts");
   const cardsSnapshot = await getDocs(cardsCollection);
   const bankAccountsSnapshot = await getDocs(bankAcoountsCollection);
-  const cardsList = cardsSnapshot.docs.map((doc) => doc.data());
+
+  let cardsList = cardsSnapshot.docs.map((doc) => doc.data());
+
+  // Optionally decrypt card data
+  if (decryptCards) {
+    cardsList = await Promise.all(
+      cardsList.map(async (card) => {
+        try {
+          if (card.metaData && isEncrypted(card.metaData.cardNumber)) {
+            const decryptedMetadata = await decryptCardSensitiveData(
+              card.metaData
+            );
+            return {
+              ...card,
+              metaData: {
+                ...card.metaData,
+                ...decryptedMetadata,
+              },
+            };
+          }
+        } catch (error) {
+          console.error(`Failed to decrypt card ${card.id}:`, error);
+        }
+        return card;
+      })
+    );
+  }
+
   const bankAccountsList = bankAccountsSnapshot.docs.map((doc) => doc.data());
   const resources = { cards: cardsList, accounts: bankAccountsList };
   return resources;
@@ -61,25 +95,45 @@ export const getBanksDropdownOptions = async () => {
 };
 
 export const addCard = async (cardMetaData) => {
-  const cardId = `${cardMetaData?.bankName}_XX${cardMetaData?.cardNumber?.slice(
-    -4
-  )}`;
-  const card = {
-    id: cardId,
-    resourceIdentifier: `card_${cardId}`,
-    metaData: cardMetaData || {},
-    billingDate: "10",
-    dueDate: "30",
-    billDue: "0",
-    lastBillAmount: "0",
-    lastBilledDate: "2024-05-10",
-    creditLimit: "300000",
-    availableCredit: "300000",
-    offset: "0",
-    outstanding: "0",
-  };
-  await setDoc(doc(db, "cards", card.id), card);
-  return { success: true };
+  try {
+    const cardId = `${
+      cardMetaData?.bankName
+    }_XX${cardMetaData?.cardNumber?.slice(-4)}`;
+
+    // Encrypt sensitive card data
+    const encryptedMetadata = await encryptCardSensitiveData(cardMetaData);
+
+    // Get last 4 digits and card brand for display
+    const lastFour = await getLastFourDigits(cardMetaData.cardNumber);
+    const cardBrand = await detectCardBrand(cardMetaData.cardNumber);
+
+    const card = {
+      id: cardId,
+      resourceIdentifier: `card_${cardId}`,
+      metaData: {
+        ...encryptedMetadata,
+        lastFourDigits: lastFour,
+        cardBrand: cardBrand,
+      },
+      billingDate: "10",
+      dueDate: "30",
+      billDue: "0",
+      lastBillAmount: "0",
+      lastBilledDate: new Date().toISOString().split("T")[0],
+      creditLimit: "300000",
+      availableCredit: "300000",
+      offset: "0",
+      outstanding: "0",
+      createdAt: new Date().toISOString(),
+    };
+
+    await setDoc(doc(db, "cards", card.id), card);
+    console.log("Card added with encryption:", cardId);
+    return { success: true, cardId };
+  } catch (error) {
+    console.error("Failed to add card:", error);
+    throw error;
+  }
 };
 
 export const deleteCard = async (cardId) => {
@@ -88,25 +142,61 @@ export const deleteCard = async (cardId) => {
 };
 
 export const updateCard = async (cardId, updates) => {
-  const cardRef = doc(db, "cards", cardId);
-  const updateData = {
-    creditLimit: updates.creditLimit?.toString() || "0",
-    outstanding: updates.outstanding?.toString() || "0",
-    availableCredit: (
-      (parseFloat(updates.creditLimit) || 0) -
-      (parseFloat(updates.outstanding) || 0)
-    ).toString(),
-    billingDate: updates.billingDate?.toString() || "1",
-    dueDate: updates.dueDate?.toString() || "1",
-    metaData: {
-      cardName: updates.cardName || "",
-      cardType: updates.cardType || "",
-      ...updates.metaData,
-    },
-    updatedAt: new Date().toISOString(),
-  };
-  await setDoc(cardRef, updateData, { merge: true });
-  return { success: true };
+  try {
+    const cardRef = doc(db, "cards", cardId);
+
+    const updateData = {
+      creditLimit: updates.creditLimit?.toString() || "0",
+      outstanding: updates.outstanding?.toString() || "0",
+      availableCredit: (
+        (parseFloat(updates.creditLimit) || 0) -
+        (parseFloat(updates.outstanding) || 0)
+      ).toString(),
+      billingDate: updates.billingDate?.toString() || "1",
+      dueDate: updates.dueDate?.toString() || "1",
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Handle metadata updates
+    if (updates.metaData) {
+      const metaDataUpdates = { ...updates.metaData };
+
+      // Check if we need to encrypt sensitive fields
+      const hasCardNumber = updates.metaData.cardNumber;
+      const hasCardExpiry = updates.metaData.cardExpiry;
+      const hasCardCVV = updates.metaData.cardCVV;
+
+      if (hasCardNumber || hasCardExpiry || hasCardCVV) {
+        // Encrypt sensitive fields
+        const encryptedMetadata = await encryptCardSensitiveData(
+          metaDataUpdates
+        );
+
+        // Update last 4 digits if card number changed
+        if (hasCardNumber) {
+          const lastFour = await getLastFourDigits(updates.metaData.cardNumber);
+          const cardBrand = await detectCardBrand(updates.metaData.cardNumber);
+          encryptedMetadata.lastFourDigits = lastFour;
+          encryptedMetadata.cardBrand = cardBrand;
+        }
+
+        updateData.metaData = encryptedMetadata;
+      } else {
+        // Non-sensitive metadata updates
+        updateData.metaData = {
+          cardName: updates.cardName || "",
+          cardType: updates.cardType || "",
+          ...metaDataUpdates,
+        };
+      }
+    }
+
+    await setDoc(cardRef, updateData, { merge: true });
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to update card:", error);
+    throw error;
+  }
 };
 
 export const updateBankAccount = async (accountId, updates) => {

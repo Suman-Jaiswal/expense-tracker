@@ -1,8 +1,9 @@
 import {
   BankOutlined,
   CreditCardOutlined,
-  DollarOutlined,
+  FileTextOutlined,
   PlusOutlined,
+  ReloadOutlined,
   SearchOutlined,
   WarningOutlined,
 } from "@ant-design/icons";
@@ -12,18 +13,18 @@ import {
   Col,
   Empty,
   Input,
-  Progress,
   Row,
   Select,
   Spin,
   Statistic,
   Tabs,
-  Tag,
   theme,
   Typography,
 } from "antd";
 import { useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import { featureFlag } from "../featureFlag";
+import { fetchLatestBills } from "../services/googleSheets";
 import CardView from "./CardView";
 import OverviewTab from "./OverviewTab";
 import TransactionList from "./TransactionList";
@@ -47,11 +48,138 @@ export default function ResourceList({
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("name-asc");
   const [loading] = useState(false);
+  const [latestBills, setLatestBills] = useState([]);
+  const [billsLoading, setBillsLoading] = useState(false);
+  const [billsError, setBillsError] = useState(null);
 
   useEffect(() => {
     setSelectedResource(null);
     setBreadcrumbItems([{ title: resourceTitle }]);
   }, [resource, resourceTitle]);
+
+  // Fetch latest bills from Google Sheets
+  const fetchBills = async () => {
+    try {
+      setBillsLoading(true);
+      setBillsError(null);
+      const data = await fetchLatestBills();
+
+      console.log("📊 Raw data from Google Sheets:", data);
+      console.log("📊 First bill sample:", data[0]);
+      console.log(
+        "💳 Available cards:",
+        resource.map((card) => ({
+          id: card.id,
+          resourceIdentifier: card.resourceIdentifier,
+        }))
+      );
+
+      // Transform data to match card resourceIdentifiers
+      const billsMap = {};
+      data.forEach((bill, index) => {
+        console.log(`\n📋 Processing bill ${index}:`);
+        console.log(`  Available keys:`, Object.keys(bill));
+        console.log(`  Full bill object:`, bill);
+
+        // Try all possible column name variations (including spaces)
+        const cardId =
+          bill["Card Number "] || // trailing space
+          bill[" Card Number "] || // leading and trailing spaces
+          bill["Card Number"] || // no spaces
+          bill.CardID ||
+          bill.Card ||
+          bill.card_id ||
+          bill.cardId ||
+          bill["Card ID"];
+
+        const dateRaw = bill["Due Date"] || bill.Date || bill.date || bill.DATE;
+        const date = dateRaw ? String(dateRaw) : "";
+
+        // Helper function to parse numeric values (handles strings with commas)
+        const parseAmount = (value) => {
+          if (!value) return 0;
+          // Remove commas and convert to float
+          const cleanValue = String(value).replace(/,/g, "");
+          const parsed = parseFloat(cleanValue);
+          return isNaN(parsed) ? 0 : parsed;
+        };
+
+        // Get raw values from sheet
+        const rawBillAmount =
+          bill["Total Amount Due "] || // trailing space only
+          bill[" Total Amount Due "] || // leading and trailing spaces
+          bill["Total Amount Due"] || // no spaces
+          bill.BillAmount ||
+          bill.bill_amount ||
+          bill["Bill Amount"] ||
+          bill.billAmount ||
+          "";
+
+        const rawMinimumDue =
+          bill["Minimum Amount Due"] || bill["Minimum Due"] || "";
+
+        // Parse the amounts
+        const billAmount = parseAmount(rawBillAmount);
+        const outstanding = billAmount; // Use same value
+        const minimumDue = parseAmount(rawMinimumDue);
+
+        console.log(
+          `  → CardID: "${cardId}", Date: "${date}" (type: ${typeof date}, value: ${JSON.stringify(
+            date
+          )})`
+        );
+        console.log(
+          `  → Raw Total Amount Due: "${rawBillAmount}" (type: ${typeof rawBillAmount})`
+        );
+        console.log(
+          `  → Raw Minimum Amount Due: "${rawMinimumDue}" (type: ${typeof rawMinimumDue})`
+        );
+        console.log(
+          `  → Parsed values - BillAmount: ${billAmount}, Outstanding: ${outstanding}, MinimumDue: ${minimumDue}`
+        );
+
+        if (cardId) {
+          // Map using resourceIdentifier format: card_BANKNAME_XXDIGITS
+          const resourceIdentifier = `card_${cardId}`;
+          billsMap[resourceIdentifier] = {
+            date,
+            billAmount,
+            outstanding,
+            minimumDue,
+            lastUpdated: new Date().toISOString(),
+          };
+          console.log(
+            `  ✓ Mapped to resourceIdentifier: ${resourceIdentifier}`
+          );
+        } else {
+          console.warn(
+            `  ⚠️ No CardID found for bill ${index}. Available keys:`,
+            Object.keys(bill)
+          );
+        }
+      });
+
+      console.log("📦 Final billsMap before setting state:", billsMap);
+      console.log(`📦 BillsMap keys:`, Object.keys(billsMap));
+      setLatestBills(billsMap);
+      console.log("✅ Latest bills loaded:", billsMap);
+      console.log(`✅ Mapped ${Object.keys(billsMap).length} bills to cards`);
+    } catch (error) {
+      console.error("Error fetching latest bills:", error);
+      setBillsError(error.message);
+      if (!error.message.includes("API key")) {
+        toast.error("Failed to fetch latest bills from Google Sheets");
+      }
+    } finally {
+      setBillsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (resourceType === "cards") {
+      fetchBills();
+    }
+  }, [resourceType]);
 
   // Filter and sort resources
   const filteredResources = useMemo(() => {
@@ -112,6 +240,27 @@ export default function ResourceList({
       (sum, card) => sum + parseFloat(card.outstanding || 0),
       0
     );
+
+    console.log(
+      "💳 Card outstanding values:",
+      resource.map((card) => ({
+        id: card.id,
+        outstanding: card.outstanding,
+        creditLimit: card.creditLimit,
+      }))
+    );
+
+    // Calculate total amount due from Google Sheets data
+    const totalAmountDue = Object.values(latestBills).reduce(
+      (sum, bill) => sum + parseFloat(bill.billAmount || 0),
+      0
+    );
+    console.log("💰 Total Amount Due calculation:", {
+      latestBillsCount: Object.keys(latestBills).length,
+      billAmounts: Object.values(latestBills).map((b) => b.billAmount),
+      totalAmountDue,
+    });
+
     const avgUtilization =
       resource.length > 0
         ? resource.reduce((sum, card) => {
@@ -127,13 +276,19 @@ export default function ResourceList({
       total: resource.length,
       totalLimit,
       totalOutstanding,
+      totalAmountDue,
       avgUtilization: Math.round(avgUtilization),
       availableCredit: totalLimit - totalOutstanding,
     };
-  }, [resource, resourceType]);
+  }, [resource, resourceType, latestBills]);
 
   const formatCurrency = (amount) => {
     return `₹${Math.abs(amount).toLocaleString("en-IN")}`;
+  };
+
+  const formatLakhs = (amount) => {
+    const lakhs = Math.abs(amount) / 100000;
+    return `${lakhs.toFixed(2)}L`;
   };
 
   if (loading) {
@@ -218,67 +373,172 @@ export default function ResourceList({
               </Text>
             </div>
             {resourceType === "cards" && setResourceIdentifier && (
-              <Button
-                type="primary"
-                size="large"
-                icon={<PlusOutlined />}
-                onClick={() => setResourceIdentifier("add_card")}
-              >
-                Add Card
-              </Button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Button
+                  icon={<ReloadOutlined spin={billsLoading} />}
+                  onClick={() => fetchBills()}
+                  loading={billsLoading}
+                >
+                  Sync Bills
+                </Button>
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<PlusOutlined />}
+                  onClick={() => setResourceIdentifier("add_card")}
+                >
+                  Add Card
+                </Button>
+              </div>
             )}
           </div>
 
           {/* Statistics Cards for Credit Cards */}
           {resourceType === "cards" && (
-            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-              <Col xs={24} sm={12} lg={6}>
-                <Card bordered={false} className="fade-in">
-                  <Statistic
-                    title="Total Cards"
-                    value={stats.total}
-                    prefix={<CreditCardOutlined style={{ color: "#6366f1" }} />}
-                  />
+            <Row gutter={[8, 8]} style={{ marginBottom: 24 }}>
+              <Col xs={12} sm={12} lg={6} style={{ display: "flex" }}>
+                <Card
+                  bordered={false}
+                  className="fade-in"
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                  bodyStyle={{
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "center",
+                    padding: "16px",
+                  }}
+                >
+                  <div style={{ width: "100%" }}>
+                    <Statistic
+                      title="Total Cards"
+                      value={stats.total}
+                      prefix={
+                        <CreditCardOutlined style={{ color: "#6366f1" }} />
+                      }
+                    />
+                  </div>
                 </Card>
               </Col>
-              <Col xs={24} sm={12} lg={6}>
-                <Card bordered={false} className="fade-in">
-                  <Statistic
-                    title="Total Credit Limit"
-                    value={formatCurrency(stats.totalLimit)}
-                    prefix={<BankOutlined style={{ color: "#10b981" }} />}
-                    valueStyle={{ fontSize: 20 }}
-                  />
+              <Col xs={12} sm={12} lg={6} style={{ display: "flex" }}>
+                <Card
+                  bordered={false}
+                  className="fade-in"
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                  bodyStyle={{
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "center",
+                    padding: "16px",
+                  }}
+                >
+                  <div style={{ width: "100%" }}>
+                    <Statistic
+                      title="Total Credit Limit"
+                      value={formatLakhs(stats.totalLimit)}
+                      prefix={<BankOutlined style={{ color: "#10b981" }} />}
+                    />
+                  </div>
                 </Card>
               </Col>
-              <Col xs={24} sm={12} lg={6}>
-                <Card bordered={false} className="fade-in">
-                  <Statistic
-                    title="Total Outstanding"
-                    value={formatCurrency(stats.totalOutstanding)}
-                    prefix={<DollarOutlined style={{ color: "#ef4444" }} />}
-                    valueStyle={{ fontSize: 20, color: "#ef4444" }}
-                  />
-                </Card>
-              </Col>
-              <Col xs={24} sm={12} lg={6}>
-                <Card bordered={false} className="fade-in">
-                  <Statistic
-                    title="Avg Utilization"
-                    value={stats.avgUtilization}
-                    suffix="%"
-                    prefix={
-                      <WarningOutlined
+              <Col xs={12} sm={12} lg={6} style={{ display: "flex" }}>
+                <Card
+                  bordered={false}
+                  className="fade-in"
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                  bodyStyle={{
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "center",
+                    padding: "16px",
+                  }}
+                >
+                  <div style={{ width: "100%" }}>
+                    <Statistic
+                      title="Total Latest Bills"
+                      value={formatCurrency(stats.totalAmountDue || 0)}
+                      prefix={<FileTextOutlined style={{ color: "#ef4444" }} />}
+                      valueStyle={{ color: "#ef4444" }}
+                    />
+                    {billsLoading && (
+                      <div
                         style={{
-                          color:
-                            stats.avgUtilization > 70 ? "#ef4444" : "#f59e0b",
+                          marginTop: 8,
+                          fontSize: 10,
+                          color: "#8c8c8c",
+                          opacity: 0.8,
+                          textAlign: "left",
                         }}
-                      />
-                    }
-                    valueStyle={{
-                      color: stats.avgUtilization > 70 ? "#ef4444" : "#f59e0b",
-                    }}
-                  />
+                      >
+                        Syncing...
+                      </div>
+                    )}
+                    {!billsLoading && stats.totalAmountDue === 0 && (
+                      <div
+                        style={{
+                          marginTop: 8,
+                          fontSize: 10,
+                          color: "#8c8c8c",
+                          opacity: 0.8,
+                          textAlign: "left",
+                        }}
+                      >
+                        Click Sync Bills
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </Col>
+              <Col xs={12} sm={12} lg={6} style={{ display: "flex" }}>
+                <Card
+                  bordered={false}
+                  className="fade-in"
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                  bodyStyle={{
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "center",
+                    padding: "16px",
+                  }}
+                >
+                  <div style={{ width: "100%" }}>
+                    <Statistic
+                      title="Avg Utilization"
+                      value={stats.avgUtilization}
+                      suffix="%"
+                      prefix={
+                        <WarningOutlined
+                          style={{
+                            color:
+                              stats.avgUtilization > 70 ? "#ef4444" : "#f59e0b",
+                          }}
+                        />
+                      }
+                      valueStyle={{
+                        color:
+                          stats.avgUtilization > 70 ? "#ef4444" : "#f59e0b",
+                      }}
+                    />
+                  </div>
                 </Card>
               </Col>
             </Row>
@@ -376,81 +636,13 @@ export default function ResourceList({
                           setSelectedResource(item);
                       }}
                     >
-                      <CardView content={item.metaData} />
-                      {resourceType === "cards" && (
-                        <Card
-                          bordered={false}
-                          style={{
-                            marginTop: 8,
-                            borderRadius: 8,
-                          }}
-                          bodyStyle={{ padding: "12px 16px" }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              marginBottom: 8,
-                            }}
-                          >
-                            <Text type="secondary" style={{ fontSize: 12 }}>
-                              Credit Utilization
-                            </Text>
-                            <Tag
-                              color={
-                                (parseFloat(item.outstanding || 0) /
-                                  parseFloat(item.creditLimit || 1)) *
-                                  100 >
-                                70
-                                  ? "red"
-                                  : (parseFloat(item.outstanding || 0) /
-                                      parseFloat(item.creditLimit || 1)) *
-                                      100 >
-                                    50
-                                  ? "orange"
-                                  : "green"
-                              }
-                            >
-                              {(
-                                (parseFloat(item.outstanding || 0) /
-                                  parseFloat(item.creditLimit || 1)) *
-                                100
-                              ).toFixed(1)}
-                              %
-                            </Tag>
-                          </div>
-                          <Progress
-                            percent={parseFloat(
-                              (
-                                (parseFloat(item.outstanding || 0) /
-                                  parseFloat(item.creditLimit || 1)) *
-                                100
-                              ).toFixed(1)
-                            )}
-                            strokeColor={{
-                              "0%": "#6366f1",
-                              "100%": "#8b5cf6",
-                            }}
-                            showInfo={false}
-                          />
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              marginTop: 8,
-                            }}
-                          >
-                            <Text type="secondary" style={{ fontSize: 11 }}>
-                              Outstanding:{" "}
-                              {formatCurrency(item.outstanding || 0)}
-                            </Text>
-                            <Text type="secondary" style={{ fontSize: 11 }}>
-                              Limit: {formatCurrency(item.creditLimit || 0)}
-                            </Text>
-                          </div>
-                        </Card>
-                      )}
+                      <CardView
+                        content={item.metaData}
+                        billAmount={
+                          latestBills[item.resourceIdentifier]?.billAmount ||
+                          null
+                        }
+                      />
                     </div>
                   </Col>
                 ))}

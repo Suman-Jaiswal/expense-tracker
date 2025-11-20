@@ -61,16 +61,19 @@ export default function MenuBar({ resources, setResourceIdentifier }) {
   }, [resources, getItems, setResourceIdentifier]);
 
   useEffect(() => {
-    const unsubscribe = () =>
-      window.addEventListener("resize", () => {
-        if (window.innerWidth < 768) {
-          setCollapsed(true);
-        } else {
-          setCollapsed(false);
-        }
-      });
-    unsubscribe();
-    return () => window.removeEventListener("resize", unsubscribe);
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setCollapsed(true);
+      } else {
+        setCollapsed(false);
+      }
+    };
+
+    // Set initial state
+    handleResize();
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   return (

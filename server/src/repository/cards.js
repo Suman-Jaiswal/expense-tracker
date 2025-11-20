@@ -1,5 +1,6 @@
-import { deleteDoc, doc, getDoc, setDoc } from "firebase/firestore";
+import { deleteDoc, doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../../firebase.js";
+import { encryptCardSensitiveData, decryptCardSensitiveData, getLastFourDigits } from "../utils/encryption.js";
 
 const cards = [
   {
@@ -118,8 +119,19 @@ const addCard = async (card) => {
     console.log("Card already exists with id:", id);
     return;
   }
+
+  // Encrypt sensitive card data before storing
+  const encryptedMetadata = encryptCardSensitiveData(card.metaData);
+  
+  // Also store last 4 digits in plain text for easy display
+  const lastFour = getLastFourDigits(card.metaData.cardNumber);
+  
   await setDoc(cardRef, {
     ...card,
+    metaData: {
+      ...encryptedMetadata,
+      lastFourDigits: lastFour,
+    },
     createdAt: new Date().toISOString(),
   });
   console.log("Card added with id:", id);
@@ -138,4 +150,126 @@ export const deleteAllCards = async () => {
     await deleteDoc(cardRef);
     console.log("Card deleted with id:", card.id);
   }
+};
+
+/**
+ * Get a single card by ID with decrypted sensitive data
+ * @param {string} cardId - Card ID
+ * @param {boolean} decrypt - Whether to decrypt sensitive data (default: false)
+ * @returns {Object} - Card object
+ */
+export const getCard = async (cardId, decrypt = false) => {
+  const cardRef = doc(db, "cards", cardId);
+  const docSnap = await getDoc(cardRef);
+  
+  if (!docSnap.exists()) {
+    return null;
+  }
+  
+  const cardData = docSnap.data();
+  
+  // Return encrypted data by default (for display purposes, use lastFourDigits)
+  if (!decrypt) {
+    return cardData;
+  }
+  
+  // Decrypt sensitive data if requested
+  try {
+    const decryptedMetadata = decryptCardSensitiveData(cardData.metaData);
+    return {
+      ...cardData,
+      metaData: {
+        ...cardData.metaData,
+        ...decryptedMetadata,
+      },
+    };
+  } catch (error) {
+    console.error(`Failed to decrypt card ${cardId}:`, error.message);
+    // Return encrypted data if decryption fails
+    return cardData;
+  }
+};
+
+/**
+ * Get all cards with optional decryption
+ * @param {boolean} decrypt - Whether to decrypt sensitive data (default: false)
+ * @returns {Array} - Array of card objects
+ */
+export const getAllCards = async (decrypt = false) => {
+  const cardsCollection = collection(db, "cards");
+  const snapshot = await getDocs(cardsCollection);
+  
+  const cardsList = [];
+  
+  for (const doc of snapshot.docs) {
+    const cardData = doc.data();
+    
+    if (!decrypt) {
+      cardsList.push(cardData);
+      continue;
+    }
+    
+    // Decrypt sensitive data if requested
+    try {
+      const decryptedMetadata = decryptCardSensitiveData(cardData.metaData);
+      cardsList.push({
+        ...cardData,
+        metaData: {
+          ...cardData.metaData,
+          ...decryptedMetadata,
+        },
+      });
+    } catch (error) {
+      console.error(`Failed to decrypt card ${cardData.id}:`, error.message);
+      // Add encrypted card if decryption fails
+      cardsList.push(cardData);
+    }
+  }
+  
+  return cardsList;
+};
+
+/**
+ * Update a card (encrypts sensitive data automatically)
+ * @param {string} cardId - Card ID
+ * @param {Object} updates - Card updates
+ * @returns {Object} - Success status
+ */
+export const updateCard = async (cardId, updates) => {
+  const cardRef = doc(db, "cards", cardId);
+  
+  // If updating metadata with sensitive data, encrypt it
+  if (updates.metaData) {
+    const hasCardNumber = updates.metaData.cardNumber;
+    const hasCardExpiry = updates.metaData.cardExpiry;
+    const hasCardCVV = updates.metaData.cardCVV;
+    
+    if (hasCardNumber || hasCardExpiry || hasCardCVV) {
+      // Encrypt the sensitive fields
+      const encryptedMetadata = encryptCardSensitiveData(updates.metaData);
+      
+      // Update last 4 digits if card number is being updated
+      if (hasCardNumber) {
+        const lastFour = getLastFourDigits(updates.metaData.cardNumber);
+        encryptedMetadata.lastFourDigits = lastFour;
+      }
+      
+      updates.metaData = {
+        ...updates.metaData,
+        ...encryptedMetadata,
+      };
+    }
+  }
+  
+  await setDoc(
+    cardRef,
+    {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true }
+  );
+  
+  console.log("Card updated with id:", cardId);
+  return { success: true };
 };

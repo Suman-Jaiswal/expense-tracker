@@ -1,6 +1,6 @@
 import express from "express";
 import { asyncHandler } from "../middleware/errorHandler.js";
-import { deleteAllCards, initializeCards } from "../repository/cards.js";
+import { deleteAllCards, initializeCards, getAllCards, getCard, updateCard } from "../repository/cards.js";
 import { deleteAllStatements } from "../repository/statements.js";
 import {
   addMultipleTransactions,
@@ -65,6 +65,100 @@ export function setupRoutes(app, gmail, drive) {
       res.json({
         success: true,
         message: "Transactions synchronization started",
+        timestamp: new Date().toISOString(),
+      });
+    })
+  );
+
+  // Card endpoints
+  router.get(
+    "/cards",
+    asyncHandler(async (req, res) => {
+      const decrypt = req.query.decrypt === "true";
+      const cards = await getAllCards(decrypt);
+      
+      res.json({
+        success: true,
+        data: cards,
+        count: cards.length,
+        encrypted: !decrypt,
+        timestamp: new Date().toISOString(),
+      });
+    })
+  );
+
+  router.get(
+    "/cards/:cardId",
+    asyncHandler(async (req, res) => {
+      const { cardId } = req.params;
+      const decrypt = req.query.decrypt === "true";
+      
+      const card = await getCard(cardId, decrypt);
+      
+      if (!card) {
+        return res.status(404).json({
+          success: false,
+          error: `Card not found: ${cardId}`,
+          timestamp: new Date().toISOString(),
+        });
+      }
+      
+      res.json({
+        success: true,
+        data: card,
+        encrypted: !decrypt,
+        timestamp: new Date().toISOString(),
+      });
+    })
+  );
+
+  router.post(
+    "/cards",
+    asyncHandler(async (req, res) => {
+      const cardData = req.body;
+      
+      if (!cardData || !cardData.metaData) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid request body. Card data and metadata required.",
+          timestamp: new Date().toISOString(),
+        });
+      }
+      
+      // Import addCard from repository
+      const { addCard } = await import("../repository/cards.js");
+      await addCard(cardData);
+      
+      res.status(201).json({
+        success: true,
+        message: "Card added successfully",
+        cardId: cardData.id,
+        timestamp: new Date().toISOString(),
+      });
+    })
+  );
+
+  router.patch(
+    "/cards/:cardId",
+    asyncHandler(async (req, res) => {
+      const { cardId } = req.params;
+      const updates = req.body;
+      
+      const card = await getCard(cardId);
+      if (!card) {
+        return res.status(404).json({
+          success: false,
+          error: `Card not found: ${cardId}`,
+          timestamp: new Date().toISOString(),
+        });
+      }
+      
+      await updateCard(cardId, updates);
+      
+      res.json({
+        success: true,
+        message: "Card updated successfully",
+        cardId,
         timestamp: new Date().toISOString(),
       });
     })

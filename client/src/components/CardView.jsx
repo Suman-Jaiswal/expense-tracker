@@ -1,9 +1,56 @@
 import { CheckOutlined, CopyOutlined } from "@ant-design/icons";
 import { Card, message } from "antd";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { decryptCardSensitiveData, isEncrypted } from "../utils/encryption";
 
-export default function CardView({ content = {} }) {
+export default function CardView({ content = {}, billAmount = null }) {
   const [copied, setCopied] = useState(false);
+  const [decryptedData, setDecryptedData] = useState({
+    cardNumber: null,
+    cardExpiry: null,
+    cardCVV: null,
+  });
+
+  // Decrypt sensitive data on mount
+  useEffect(() => {
+    const decryptData = async () => {
+      try {
+        // Check if any data is encrypted and decrypt
+        const hasEncryptedData =
+          (content.cardNumber && isEncrypted(content.cardNumber)) ||
+          (content.cardExpiry && isEncrypted(content.cardExpiry)) ||
+          (content.cardCVV && isEncrypted(content.cardCVV));
+
+        if (hasEncryptedData) {
+          const decrypted = await decryptCardSensitiveData(content);
+          setDecryptedData({
+            cardNumber: decrypted.cardNumber || content.cardNumber,
+            cardExpiry: decrypted.cardExpiry || content.cardExpiry,
+            cardCVV: decrypted.cardCVV || content.cardCVV,
+          });
+        } else {
+          // Data is not encrypted, use as is
+          setDecryptedData({
+            cardNumber: content.cardNumber,
+            cardExpiry: content.cardExpiry,
+            cardCVV: content.cardCVV,
+          });
+        }
+      } catch (error) {
+        console.error("Failed to decrypt card data:", error);
+        // Fall back to showing available data
+        setDecryptedData({
+          cardNumber: content.lastFourDigits
+            ? `**** **** **** ${content.lastFourDigits}`
+            : content.cardNumber,
+          cardExpiry: content.cardExpiry,
+          cardCVV: content.cardCVV,
+        });
+      }
+    };
+
+    decryptData();
+  }, [content]);
 
   // Helper to get bank logo/initial
   const getBankLogo = (bankName) => {
@@ -57,8 +104,9 @@ export default function CardView({ content = {} }) {
 
   const handleCopy = (e) => {
     e.stopPropagation();
-    if (content.cardNumber) {
-      navigator.clipboard.writeText(content.cardNumber);
+    const cardNumber = decryptedData.cardNumber || content.cardNumber;
+    if (cardNumber) {
+      navigator.clipboard.writeText(cardNumber);
       setCopied(true);
       message.success("Card number copied!");
       setTimeout(() => setCopied(false), 2000);
@@ -174,6 +222,30 @@ export default function CardView({ content = {} }) {
         </div>
       </div>
 
+      {billAmount !== null && billAmount > 0 && (
+        <div
+          style={{
+            background: "rgba(239, 68, 68, 0.15)",
+            border: "1px solid rgba(239, 68, 68, 0.3)",
+            borderRadius: 8,
+            padding: "6px 12px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            alignSelf: "flex-start",
+          }}
+        >
+          <span style={{ fontSize: 10, opacity: 0.8 }}>Bill Due:</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#ef4444" }}>
+            {new Intl.NumberFormat("en-IN", {
+              style: "currency",
+              currency: "INR",
+              maximumFractionDigits: 0,
+            }).format(billAmount)}
+          </span>
+        </div>
+      )}
+
       <div>
         <div
           style={{
@@ -187,7 +259,9 @@ export default function CardView({ content = {} }) {
             marginBottom: 16,
           }}
         >
-          {previewCardNumber(content.cardNumber)}
+          {previewCardNumber(
+            decryptedData.cardNumber || content.lastFourDigits
+          )}
           <div
             onClick={handleCopy}
             style={{
@@ -241,7 +315,19 @@ export default function CardView({ content = {} }) {
               Expiry
             </div>
             <div style={{ fontSize: 12, marginTop: 4, fontWeight: 500 }}>
-              {content.cardExpiry || "MM/YY"}
+              {(() => {
+                const expiry = decryptedData.cardExpiry || content.cardExpiry;
+                // If expiry looks like encrypted data (long string with colons), show fallback
+                if (
+                  !expiry ||
+                  (typeof expiry === "string" &&
+                    expiry.includes(":") &&
+                    expiry.length > 10)
+                ) {
+                  return "MM/YY";
+                }
+                return expiry;
+              })()}
             </div>
           </div>
           <div>
@@ -256,7 +342,19 @@ export default function CardView({ content = {} }) {
               CVV
             </div>
             <div style={{ fontSize: 12, marginTop: 4, fontWeight: 500 }}>
-              {content.cardCVV || "***"}
+              {(() => {
+                const cvv = decryptedData.cardCVV || content.cardCVV;
+                // If CVV looks like encrypted data (long string with colons), show fallback
+                if (
+                  !cvv ||
+                  (typeof cvv === "string" &&
+                    cvv.includes(":") &&
+                    cvv.length > 10)
+                ) {
+                  return "***";
+                }
+                return cvv;
+              })()}
             </div>
           </div>
         </div>

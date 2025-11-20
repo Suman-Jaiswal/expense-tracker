@@ -6,6 +6,7 @@ import {
   getDocs,
   query,
   setDoc,
+  updateDoc,
   where,
 } from "firebase/firestore";
 import { Readable } from "stream";
@@ -59,6 +60,11 @@ export const addStatement = async (statement) => {
     ...statement,
     createdAt: new Date().toISOString(),
   });
+};
+
+export const updateStatement = async (id, statementData) => {
+  const statementRef = doc(db, "statements", id);
+  await updateDoc(statementRef, statementData);
 };
 
 export const addMultipleStatements = async (statements) => {

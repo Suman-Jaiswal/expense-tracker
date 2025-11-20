@@ -271,6 +271,195 @@ function extractStatementPeriod(subject, resourceConfig) {
 }
 
 /**
+ * Extract comprehensive metadata from PDF
+ * Extracts due date, due amount, total spend, and statement date
+ */
+async function extractMetadataFromPDF(pdfPath) {
+  try {
+    const dataBuffer = fs.readFileSync(pdfPath);
+    const pdfData = await pdfParse(dataBuffer);
+    const pdfText = pdfData.text;
+    const lines = pdfText.split("\n").map((l) => l.trim());
+
+    const metadata = {
+      dueDate: null,
+      dueAmount: null,
+      totalSpend: null,
+      statementDate: null,
+    };
+
+    // AXIS-specific extraction
+    const axisDueDateMatch = pdfText.match(
+      /(\d{2}\/\d{2}\/\d{4})\s*-\s*\d{2}\/\d{2}\/\d{4}(\d{2}\/\d{2}\/\d{4})(\d{2}\/\d{2}\/\d{4})/
+    );
+    if (axisDueDateMatch) {
+      metadata.dueDate = axisDueDateMatch[2];
+      metadata.statementDate = axisDueDateMatch[3];
+    }
+
+    const axisTableMatch = pdfText.match(
+      /Previous Balance.*?Purchase.*?Total Payment Due.*?\n\s*([\d,]+\.?\d{0,2})\s+([\d,]+\.?\d{0,2})([\d,]+\.?\d{0,2})([\d,]+\.?\d{0,2})([\d,]+\.?\d{0,2})([\d,]+\.?\d{0,2})([\d,]+\.?\d{0,2})/i
+    );
+    if (axisTableMatch) {
+      const purchaseAmount = parseFloat(axisTableMatch[4].replace(/,/g, ""));
+      if (purchaseAmount > 0 && !metadata.totalSpend) {
+        metadata.totalSpend = purchaseAmount;
+      }
+      const totalAmount = parseFloat(axisTableMatch[7].replace(/,/g, ""));
+      if (totalAmount > 0 && !metadata.dueAmount) {
+        metadata.dueAmount = totalAmount;
+      }
+    }
+
+    // ICICI: Search for standalone date lines
+    const iciciDates = [];
+    for (let i = 0; i < Math.min(100, lines.length); i++) {
+      if (
+        /^(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}$/.test(
+          lines[i]
+        )
+      ) {
+        iciciDates.push(lines[i]);
+      }
+    }
+    if (iciciDates.length >= 1 && !metadata.statementDate) {
+      metadata.statementDate = iciciDates[0];
+    }
+    if (iciciDates.length >= 2 && !metadata.dueDate) {
+      metadata.dueDate = iciciDates[1];
+    }
+
+    // ICICI: Extract total spend and due amount
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // Due amount in backtick format
+      if (i < 50 && /^`[\d,]+\.?\d{0,2}$/.test(line) && !metadata.dueAmount) {
+        const amountMatch = line.match(/`([\d,]+\.?\d{0,2})/);
+        if (amountMatch) {
+          const amount = parseFloat(amountMatch[1].replace(/,/g, ""));
+          if (amount > 200 && amount < 10000000) {
+            metadata.dueAmount = amount;
+          }
+        }
+      }
+
+      // Total spend from table
+      if (
+        /Previous Balance.*?Purchases.*?Charges.*?Cash Advances/i.test(line)
+      ) {
+        const nextLine = i + 1 < lines.length ? lines[i + 1] : "";
+        const amounts = nextLine.match(
+          /`([\d,]+\.?\d{0,2})`([\d,]+\.?\d{0,2})`([\d,]+\.?\d{0,2})/
+        );
+        if (amounts && !metadata.totalSpend) {
+          const purchaseAmount = parseFloat(amounts[2].replace(/,/g, ""));
+          if (purchaseAmount > 0) {
+            metadata.totalSpend = purchaseAmount;
+          }
+        }
+      }
+    }
+
+    // Fallback: Sum debit transactions
+    if (!metadata.totalSpend) {
+      const debitMatches = pdfText.matchAll(
+        /(\d{1,3}(?:,\d{3})*\.?\d{0,2})\s*Dr/gi
+      );
+      let totalDebits = 0;
+      let count = 0;
+      for (const match of debitMatches) {
+        const amount = parseFloat(match[1].replace(/,/g, ""));
+        if (amount > 0 && amount < 1000000) {
+          totalDebits += amount;
+          count++;
+        }
+      }
+      if (count > 0 && totalDebits > 100) {
+        metadata.totalSpend = totalDebits;
+      }
+    }
+
+    return metadata;
+  } catch (error) {
+    console.log(`   ⚠️  PDF extraction error: ${error.message}`);
+    return {
+      dueDate: null,
+      dueAmount: null,
+      totalSpend: null,
+      statementDate: null,
+    };
+  }
+}
+
+/**
+ * Extract metadata from email subject and body
+ */
+function extractMetadataFromEmail(subject, bodyHTML) {
+  const metadata = {
+    dueDate: null,
+    dueAmount: null,
+    totalSpend: null,
+    statementDate: null,
+  };
+
+  // Extract from subject
+  const subjectText = subject.toLowerCase();
+
+  // Extract from HTML body if available
+  if (bodyHTML) {
+    try {
+      const dom = new JSDOM(bodyHTML);
+      const bodyText = dom.window.document.body.textContent || "";
+
+      // Look for common patterns in email body
+      const dueDateMatch = bodyText.match(
+        /(?:payment\s+due\s+date|pay\s+by)[:\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/i
+      );
+      if (dueDateMatch) {
+        metadata.dueDate = dueDateMatch[1];
+      }
+
+      const dueAmountMatch = bodyText.match(
+        /(?:total\s+amount\s+due|amount\s+due)[:\s]*(?:rs\.?|₹)?\s*([\d,]+\.?\d{0,2})/i
+      );
+      if (dueAmountMatch) {
+        const amount = parseFloat(dueAmountMatch[1].replace(/,/g, ""));
+        if (amount > 0 && amount < 10000000) {
+          metadata.dueAmount = amount;
+        }
+      }
+
+      const totalSpendMatch = bodyText.match(
+        /(?:purchases?|total\s+spend)[:\s]*(?:rs\.?|₹)?\s*([\d,]+\.?\d{0,2})/i
+      );
+      if (totalSpendMatch) {
+        const amount = parseFloat(totalSpendMatch[1].replace(/,/g, ""));
+        if (amount > 0 && amount < 10000000) {
+          metadata.totalSpend = amount;
+        }
+      }
+    } catch (error) {
+      console.log(`   ⚠️  Email body parsing error: ${error.message}`);
+    }
+  }
+
+  return metadata;
+}
+
+/**
+ * Merge metadata from email and PDF (PDF takes priority)
+ */
+function mergeMetadata(emailMeta, pdfMeta) {
+  return {
+    dueDate: pdfMeta.dueDate || emailMeta.dueDate,
+    dueAmount: pdfMeta.dueAmount || emailMeta.dueAmount,
+    totalSpend: pdfMeta.totalSpend || emailMeta.totalSpend,
+    statementDate: pdfMeta.statementDate || emailMeta.statementDate,
+  };
+}
+
+/**
  * Fetch and process credit card statements from Gmail
  *
  * Flow:
@@ -278,7 +467,8 @@ function extractStatementPeriod(subject, resourceConfig) {
  * 2. Extract PDF attachments
  * 3. Validate card numbers against configuration
  * 4. Decrypt PDFs and upload to Google Drive
- * 5. Save statement metadata to Firebase
+ * 5. Extract metadata from both email and PDF
+ * 6. Save statement metadata to Firebase
  *
  * Note: Transaction extraction happens separately via /sync-transactions
  */
@@ -305,6 +495,7 @@ const fetchStatements = async (gmail, drive, resourceConfig) => {
   let processed = 0;
   let skipped = 0;
   let errors = 0;
+  let updated = 0;
   const newStatements = [];
 
   for (const message of messages) {
@@ -406,19 +597,77 @@ const fetchStatements = async (gmail, drive, resourceConfig) => {
       console.log(`   📁 File: ${fileName}`);
 
       // Upload PDF to Drive
-      const { driveRes } = await validateStatementPDFAndUploadToDrive(
-        gmail,
-        drive,
-        attachmentPart,
-        fileName,
-        message,
-        resourceConfig.pdfPassword
-      );
+      const { driveRes, localPdfPath } =
+        await validateStatementPDFAndUploadToDrive(
+          gmail,
+          drive,
+          attachmentPart,
+          fileName,
+          message,
+          resourceConfig.pdfPassword
+        );
 
       if (!driveRes) {
         console.log(`   ❌ Failed to upload to Drive`);
         errors++;
         continue;
+      }
+
+      // Extract metadata from email body
+      const bodyHTML = bodyData
+        ? Buffer.from(bodyData, "base64").toString("utf8")
+        : null;
+      const emailMetadata = extractMetadataFromEmail(subject, bodyHTML);
+
+      // Extract metadata from PDF (if local path is available)
+      console.log(`   📊 Extracting metadata from PDF and email...`);
+      let pdfMetadata = {
+        dueDate: null,
+        dueAmount: null,
+        totalSpend: null,
+        statementDate: null,
+      };
+
+      if (localPdfPath && fs.existsSync(localPdfPath)) {
+        pdfMetadata = await extractMetadataFromPDF(localPdfPath);
+      }
+
+      // Merge metadata (PDF takes priority)
+      const combinedMetadata = mergeMetadata(emailMetadata, pdfMetadata);
+
+      // Log extracted metadata
+      if (combinedMetadata.dueDate) {
+        console.log(`   📅 Due Date: ${combinedMetadata.dueDate}`);
+      }
+      if (combinedMetadata.dueAmount) {
+        console.log(
+          `   💰 Due Amount: ₹${combinedMetadata.dueAmount.toLocaleString("en-IN")}`
+        );
+      }
+      if (combinedMetadata.totalSpend) {
+        console.log(
+          `   💳 Total Spend: ₹${combinedMetadata.totalSpend.toLocaleString("en-IN")}`
+        );
+      }
+      if (combinedMetadata.statementDate) {
+        console.log(`   📆 Statement Date: ${combinedMetadata.statementDate}`);
+      }
+
+      // Merge with statementData
+      const enhancedStatementData = {
+        ...statementData,
+        ...combinedMetadata,
+      };
+
+      // Clean up temporary PDF file
+      if (localPdfPath && fs.existsSync(localPdfPath)) {
+        try {
+          fs.unlinkSync(localPdfPath);
+        } catch (cleanupError) {
+          console.log(
+            `   ⚠️  Could not clean up temp file: ${cleanupError.message}`
+          );
+        }
       }
 
       // Save statement metadata to Firebase
@@ -431,7 +680,7 @@ const fetchStatements = async (gmail, drive, resourceConfig) => {
           cardNumber,
           ...periodInfo,
         },
-        statementData
+        enhancedStatementData
       );
 
       if (saveResult && saveResult.isNew) {
@@ -441,6 +690,8 @@ const fetchStatements = async (gmail, drive, resourceConfig) => {
           cardNumber,
           displayName: `${resourceConfig.label} XX${cardNumber.slice(-4)}`,
         });
+      } else if (saveResult && saveResult.updated) {
+        updated++;
       }
 
       console.log(`   ✅ Statement processing complete\n`);
@@ -459,12 +710,14 @@ const fetchStatements = async (gmail, drive, resourceConfig) => {
   console.log(`   Skipped: ${skipped}`);
   console.log(`   Errors: ${errors}`);
   console.log(`   New statements: ${newStatements.length}`);
+  console.log(`   Updated statements: ${updated}`);
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 
   return {
     processed,
     skipped,
     errors,
+    updated,
     newStatements,
   };
 };

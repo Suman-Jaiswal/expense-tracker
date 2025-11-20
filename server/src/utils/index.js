@@ -5,6 +5,7 @@ import {
   checkStatementExists,
   checkStatementExistsByPeriod,
   checkStatementExistsInDrive,
+  updateStatement,
   uploadPdfBytesToDrive,
 } from "../repository/statements.js";
 import { decryptPdfTmp } from "./pdfDecrypter.js";
@@ -35,7 +36,7 @@ export const validateStatementPDFAndUploadToDrive = async (
     console.log(
       `   ℹ️  Will check if statement metadata exists in Firebase...`
     );
-    return { driveRes: existingDriveFile };
+    return { driveRes: existingDriveFile, localPdfPath: null };
   }
 
   console.log(`   📥 Downloading attachment from email...`);
@@ -69,10 +70,9 @@ export const validateStatementPDFAndUploadToDrive = async (
   );
   console.log(`   ✅ Uploaded to Drive: ${driveFile.id}`);
 
-  // Clean up temporary file
-  fs.unlinkSync(config.TEMP_PDF_PATH);
-
-  return { driveRes: driveFile };
+  // Return path before cleanup so metadata can be extracted
+  // Note: Caller is responsible for cleanup if needed
+  return { driveRes: driveFile, localPdfPath: config.TEMP_PDF_PATH };
 };
 
 export const prepareStatementObjectAndSaveInDB = async (
@@ -97,18 +97,60 @@ export const prepareStatementObjectAndSaveInDB = async (
   );
   if (existingByPeriod) {
     console.log(
-      `   ✅ Statement metadata already exists in Firebase (${period.start} to ${period.end})`
+      `   ℹ️  Statement already exists in Firebase (${period.start} to ${period.end})`
     );
-    return { isNew: false, statement: existingByPeriod };
+
+    // Check if we have new metadata to update
+    const hasNewMetadata =
+      statementData.dueDate ||
+      statementData.dueAmount ||
+      statementData.totalSpend ||
+      statementData.statementDate;
+
+    if (hasNewMetadata) {
+      console.log(`   🔄 Updating statement metadata...`);
+      const updatedStatement = {
+        ...existingByPeriod,
+        ...statementData,
+        updatedAt: new Date().toISOString(),
+      };
+      await updateStatement(existingByPeriod.id, updatedStatement);
+      console.log(`   ✅ Statement metadata updated in Firebase`);
+      return { isNew: false, updated: true, statement: updatedStatement };
+    } else {
+      console.log(`   ✅ No new metadata to update`);
+      return { isNew: false, updated: false, statement: existingByPeriod };
+    }
   }
 
   // Check for duplicate by message ID (secondary check)
   const existingByMessageId = await checkStatementExists(messageId);
   if (existingByMessageId) {
     console.log(
-      `   ✅ Statement metadata already exists in Firebase (message ID: ${messageId})`
+      `   ℹ️  Statement already exists in Firebase (message ID: ${messageId})`
     );
-    return { isNew: false, statement: null };
+
+    // Check if we have new metadata to update
+    const hasNewMetadata =
+      statementData.dueDate ||
+      statementData.dueAmount ||
+      statementData.totalSpend ||
+      statementData.statementDate;
+
+    if (hasNewMetadata) {
+      console.log(`   🔄 Updating statement metadata...`);
+      const updatedStatement = {
+        ...existingByMessageId,
+        ...statementData,
+        updatedAt: new Date().toISOString(),
+      };
+      await updateStatement(messageId, updatedStatement);
+      console.log(`   ✅ Statement metadata updated in Firebase`);
+      return { isNew: false, updated: true, statement: updatedStatement };
+    } else {
+      console.log(`   ✅ No new metadata to update`);
+      return { isNew: false, updated: false, statement: existingByMessageId };
+    }
   }
 
   // Statement doesn't exist in Firebase, add it
@@ -120,7 +162,7 @@ export const prepareStatementObjectAndSaveInDB = async (
     driveFileWebViewLink: driveRes.webViewLink,
     driveFileWebContentLink: driveRes.webContentLink,
     period,
-    statementData,
+    ...statementData,
   };
   await addStatement(newStatement);
   console.log(`   ✅ Statement metadata saved to Firebase`);
